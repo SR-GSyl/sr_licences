@@ -1,0 +1,222 @@
+<?php
+declare(strict_types=1);
+
+namespace SrLicences\Repository;
+
+use PDO;
+
+final class LicenceRepository
+{
+    public function __construct(private PDO $pdo)
+    {
+    }
+
+    public function compterLicences(): int
+    {
+        $sql = 'SELECT COUNT(*) FROM sr_licence';
+        return (int)$this->pdo->query($sql)->fetchColumn();
+    }
+
+    public function obtenirStatistiquesParStatut(): array
+    {
+        $statistiques = [
+            'total' => 0,
+            'active' => 0,
+            'suspendue' => 0,
+            'revoquee' => 0,
+            'expiree' => 0,
+            'invalide' => 0,
+        ];
+
+        $sql = '
+            SELECT statut, COUNT(*) AS total_statut
+            FROM sr_licence
+            GROUP BY statut
+        ';
+
+        $lignes = $this->pdo->query($sql)->fetchAll();
+
+        foreach ($lignes as $ligne) {
+            $statut = (string)($ligne['statut'] ?? '');
+            $total = (int)($ligne['total_statut'] ?? 0);
+
+            $statistiques['total'] += $total;
+
+            if (array_key_exists($statut, $statistiques)) {
+                $statistiques[$statut] = $total;
+            }
+        }
+
+        return $statistiques;
+    }
+
+    public function insererLicence(array $donnees): int
+    {
+        $sql = '
+            INSERT INTO sr_licence (
+                cle_licence,
+                code_module,
+                statut,
+                nom_client,
+                email_client,
+                domaine_principal,
+                version_max_autorisee,
+                date_creation,
+                date_activation,
+                commentaire_interne
+            ) VALUES (
+                :cle_licence,
+                :code_module,
+                :statut,
+                :nom_client,
+                :email_client,
+                :domaine_principal,
+                :version_max_autorisee,
+                NOW(),
+                :date_activation,
+                :commentaire_interne
+            )
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':cle_licence' => (string)($donnees['cle_licence'] ?? ''),
+            ':code_module' => (string)($donnees['code_module'] ?? ''),
+            ':statut' => (string)($donnees['statut'] ?? 'active'),
+            ':nom_client' => $this->normaliserNullable($donnees['nom_client'] ?? null),
+            ':email_client' => $this->normaliserNullable($donnees['email_client'] ?? null),
+            ':domaine_principal' => $this->normaliserNullable($donnees['domaine_principal'] ?? null),
+            ':version_max_autorisee' => $this->normaliserNullable($donnees['version_max_autorisee'] ?? null),
+            ':date_activation' => !empty($donnees['date_activation']) ? (string)$donnees['date_activation'] : null,
+            ':commentaire_interne' => $this->normaliserNullable($donnees['commentaire_interne'] ?? null),
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function listerLicences(int $limit = 100): array
+    {
+        $limit = max(1, min($limit, 200));
+
+        $sql = sprintf(
+            'SELECT
+                id_licence,
+                cle_licence,
+                code_module,
+                statut,
+                nom_client,
+                email_client,
+                domaine_principal,
+                version_max_autorisee,
+                date_creation,
+                date_activation
+             FROM sr_licence
+             ORDER BY id_licence DESC
+             LIMIT %d',
+            $limit
+        );
+
+        return $this->pdo->query($sql)->fetchAll();
+    }
+
+    public function licenceExiste(int $idLicence): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM sr_licence WHERE id_licence = :id_licence');
+        $stmt->execute([':id_licence' => $idLicence]);
+
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    public function mettreAJourStatutLicence(int $idLicence, string $statut): void
+    {
+        if ($statut === 'active') {
+            $sql = '
+                UPDATE sr_licence
+                SET
+                    statut = :statut,
+                    date_activation = COALESCE(date_activation, NOW()),
+                    date_maj = NOW()
+                WHERE id_licence = :id_licence
+            ';
+        } else {
+            $sql = '
+                UPDATE sr_licence
+                SET
+                    statut = :statut,
+                    date_maj = NOW()
+                WHERE id_licence = :id_licence
+            ';
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':statut' => $statut,
+            ':id_licence' => $idLicence,
+        ]);
+    }
+
+    public function trouverLicenceParCleEtModule(string $cleLicence, string $codeModule): ?array
+    {
+        $sql = '
+            SELECT
+                id_licence,
+                cle_licence,
+                code_module,
+                statut,
+                nom_client,
+                email_client,
+                domaine_principal,
+                version_max_autorisee,
+                date_creation,
+                date_activation,
+                date_expiration,
+                grace_jusqu_a
+            FROM sr_licence
+            WHERE cle_licence = :cle_licence
+              AND code_module = :code_module
+            LIMIT 1
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':cle_licence' => $cleLicence,
+            ':code_module' => $codeModule,
+        ]);
+
+        $ligne = $stmt->fetch();
+
+        return is_array($ligne) ? $ligne : null;
+    }
+
+    public function obtenirDomainesTestActifs(int $idLicence): array
+    {
+        $sql = '
+            SELECT domaine
+            FROM sr_licence_domaine_test
+            WHERE id_licence = :id_licence
+              AND actif = 1
+            ORDER BY domaine ASC
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':id_licence' => $idLicence,
+        ]);
+
+        $domaines = [];
+        foreach ($stmt->fetchAll() as $ligne) {
+            $domaine = trim((string)($ligne['domaine'] ?? ''));
+            if ($domaine !== '') {
+                $domaines[] = $domaine;
+            }
+        }
+
+        return $domaines;
+    }
+
+    private function normaliserNullable(mixed $valeur): ?string
+    {
+        $valeur = trim((string)$valeur);
+        return $valeur !== '' ? $valeur : null;
+    }
+}

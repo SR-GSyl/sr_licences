@@ -1,0 +1,17 @@
+DirectoryIndex index.php index.html
+
+Options -MultiViews
+
+RewriteEngine On
+RewriteBase /
+
+# Laisser intact le dossier technique de validation
+RewriteRule ^\.well-known/ - [L]
+
+# Si le fichier ou dossier existe physiquement, on le sert tel quel
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Sinon, tout passe par le front controller
+RewriteRule ^ index.php [L,QSA]

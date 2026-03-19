@@ -1,0 +1,36 @@
+# Secrets
+config/config.php
+*.pem
+*.key
+*.crt
+
+# Dumps SQL
+*.sql
+*.sql.gz
+!sql/
+!sql/schema.sql
+
+# Logs / runtime
+var/log/*
+!var/log/.gitkeep
+
+# Sauvegardes locales
+*.bak
+*.bak.*
+*.old
+*.tmp
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+
+# Fichiers système / éditeur
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Spécifique prod / certificat
+.well-known/
