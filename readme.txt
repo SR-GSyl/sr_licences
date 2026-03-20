@@ -18,7 +18,7 @@ En pratique :
 
 Organisation actuelle
 ---------------------
-- Préprod locale :
+- En Dev :
   /home/sylvere/Git_depot_local/sr_licences
 
 - Dossier de déploiement reconstruit pour WinSCP :
@@ -111,10 +111,11 @@ Procédure de travail recommandée
 1. Modifier les fichiers dans le dépôt local :
    /home/sylvere/Git_depot_local/sr_licences
 
-2. Lancer soit :
-   - preparer_deploiement.sh
+2. Lancer:
+   - soit: ./preparer_deploiement.sh (./ signifie : “exécuter le fichier situé dans le dossier courant”.)
+   - soit: /home/sylvere/Git_depot_local/sr_licences/preparer_deploiement.sh
    ou
-   - preparer_commit_et_deploiement.sh "message"
+   - ./preparer_commit_et_deploiement.sh "message"
 
 3. Vérifier le contenu de :
    /mnt/c/Users/soulr/Downloads/sr_licences_deploiement
@@ -144,3 +145,6 @@ Le dossier de déploiement est un dossier tampon de livraison.
 Il ne remplace pas le dépôt Git.
 Le dépôt Git reste la source de travail.
 Le dossier de déploiement sert uniquement à préparer ce qui doit partir en prod.
+
+8. BDD
+Pour voir les table de la BDD => mysql -u sylvere -p -e "USE sr_licences_dev; SHOW TABLES;"
