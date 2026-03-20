@@ -47,6 +47,7 @@ rsync -avm \
   --exclude='*.bak.*' \
   --exclude='preparer_deploiement.sh' \
   --exclude='preparer_commit_et_deploiement.sh' \
+  --exclude='readme.txt' \
   "$DOSSIER_DEPOT"/ \
   "$DOSSIER_DEPLOIEMENT"/
 
