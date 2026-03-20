@@ -18,24 +18,34 @@ En pratique :
 
 Organisation actuelle
 ---------------------
-- En Dev :
+- Dépôt Git (source de travail en dev) :
   /home/sylvere/Git_depot_local/sr_licences
 
-- Dossier de déploiement reconstruit pour WinSCP :
-  /mnt/c/Users/soulr/Downloads/sr_licences_deploiement
+- Runtime Dev (instance web servie par Apache) :
+  /var/www/sr_licences_dev
+
+- URL Dev :
+  http://sr-licences-dev.local/
+
+- Base de données Dev :
+  sr_licences_dev
+
+- Dossier de déploiement reconstruit pour la prod via WinSCP :
+  /mnt/c/Users/soulr/Downloads/sr_licences_deploiement_prod
 
 - Prod :
   hébergement AMEN, mise à jour via WinSCP.
 
-Principe de déploiement retenu
-------------------------------
-Le dépôt Git local contient les fichiers de travail.
+Principe de fonctionnement retenu
+---------------------------------
+Le dépôt Git en dev contient les fichiers de travail.
 
 On ne pousse PAS directement tout le dépôt vers la prod.
 À la place :
-1. on prépare un dossier de déploiement propre ;
-2. ce dossier exclut les éléments sensibles ou inutiles ;
-3. on envoie ensuite ce dossier vers la prod avec WinSCP.
+1. on travaille dans le dépôt Git de dev ;
+2. on propage vers l’instance Dev pour tester localement ;
+3. on prépare un dossier de déploiement propre pour la prod ;
+4. on envoie ensuite ce dossier vers la prod avec WinSCP.
 
 Cette méthode évite notamment d’écraser :
 - config/config.php
@@ -46,39 +56,72 @@ Cette méthode évite notamment d’écraser :
 
 Scripts utilisés
 ----------------
-1) Script de préparation du dossier de déploiement
+1) Script de propagation vers l’instance Dev
 
-Nom conseillé :
+Nom :
+propager_vers_dev.sh
+
+Rôle :
+- prendre le dépôt Git comme source ;
+- recopier les fichiers utiles vers /var/www/sr_licences_dev ;
+- exclure les éléments inutiles au runtime ;
+- permettre de tester l’application Dev dans le navigateur.
+
+Commande d’exécution :
+./propager_vers_dev.sh
+
+2) Script de préparation du dossier de déploiement prod
+
+Nom :
 preparer_deploiement.sh
 
 Rôle :
-- supprimer l’ancien dossier de déploiement ;
+- supprimer l’ancien dossier de déploiement prod ;
 - recréer un dossier propre ;
 - copier uniquement les fichiers utiles à la prod.
 
 Commande d’exécution :
-/home/sylvere/Git_depot_local/sr_licences/preparer_deploiement.sh
+./preparer_deploiement.sh
 
-2) Script de commit + préparation du dossier de déploiement
+3) Script de commit + préparation du dossier de déploiement prod
 
-Nom conseillé :
+Nom :
 preparer_commit_et_deploiement.sh
 
 Rôle :
-- se placer dans le dépôt local ;
+- se placer dans le dépôt Git de dev ;
 - faire git add -A ;
 - créer un commit avec le message fourni ;
-- supprimer l’ancien dossier de déploiement ;
-- reconstruire un nouveau dossier propre pour WinSCP.
+- lancer ensuite la reconstruction du dossier de déploiement prod.
 
 Commande d’exécution :
-/home/sylvere/Git_depot_local/sr_licences/preparer_commit_et_deploiement.sh "Mon message de commit"
+./preparer_commit_et_deploiement.sh "Mon message de commit"
 
 Exemple :
-/home/sylvere/Git_depot_local/sr_licences/preparer_commit_et_deploiement.sh "Correction index.php et préparation du déploiement"
+./preparer_commit_et_deploiement.sh "Correction index.php et préparation du déploiement prod"
 
-Fichiers exclus du dossier de déploiement
------------------------------------------
+Fichiers exclus de l’instance Dev
+---------------------------------
+Le script propager_vers_dev.sh exclut actuellement :
+- .git/
+- .github/
+- .well-known/
+- sql/
+- var/
+- *.bak
+- *.bak.*
+- readme.txt
+- readme_sr_licences.txt
+- preparer_deploiement.sh
+- preparer_commit_et_deploiement.sh
+- propager_vers_dev.sh
+
+Conséquence :
+- l’instance Dev est une copie runtime du dépôt ;
+- elle garde bien config/ et .htaccess, car ils sont nécessaires à son fonctionnement.
+
+Fichiers exclus du dossier de déploiement prod
+----------------------------------------------
 Les scripts de préparation excluent actuellement :
 - .git/
 - .github/
@@ -90,16 +133,19 @@ Les scripts de préparation excluent actuellement :
 - var/
 - *.bak
 - *.bak.*
+- readme.txt
+- readme_sr_licences.txt
 - preparer_deploiement.sh
 - preparer_commit_et_deploiement.sh
+- propager_vers_dev.sh
 
-Conséquence importante :
-- le dossier de déploiement n’est PAS autonome ;
+Conséquences importantes :
+- le dossier de déploiement prod n’est PAS autonome ;
 - la prod doit déjà posséder son propre config/config.php ;
 - la prod conserve également son propre .htaccess tant qu’on choisit de ne pas le déployer.
 
-Contenu attendu du dossier de déploiement
------------------------------------------
+Contenu attendu du dossier de déploiement prod
+----------------------------------------------
 En l’état actuel, le dossier propre destiné à la prod doit contenir essentiellement :
 - index.php
 - src/
@@ -108,28 +154,33 @@ Cela correspond à une mise à jour sélective du code, et non à une installati
 
 Procédure de travail recommandée
 --------------------------------
-1. Modifier les fichiers dans le dépôt local :
+1. Modifier les fichiers dans le dépôt Git de dev :
    /home/sylvere/Git_depot_local/sr_licences
 
-2. Lancer:
-   - soit: ./preparer_deploiement.sh (./ signifie : “exécuter le fichier situé dans le dossier courant”.)
-   - soit: /home/sylvere/Git_depot_local/sr_licences/preparer_deploiement.sh
+2. Propager vers l’instance Dev :
+   ./propager_vers_dev.sh
+
+3. Tester dans le navigateur :
+   http://sr-licences-dev.local/
+
+4. Préparer le dossier de déploiement prod :
+   ./preparer_deploiement.sh
    ou
-   - ./preparer_commit_et_deploiement.sh "message"
+   ./preparer_commit_et_deploiement.sh "message"
 
-3. Vérifier le contenu de :
-   /mnt/c/Users/soulr/Downloads/sr_licences_deploiement
+5. Vérifier le contenu de :
+   /mnt/c/Users/soulr/Downloads/sr_licences_deploiement_prod
 
-4. Ouvrir WinSCP.
+6. Ouvrir WinSCP.
 
-5. Côté local, choisir :
-   /mnt/c/Users/soulr/Downloads/sr_licences_deploiement
+7. Côté local, choisir :
+   /mnt/c/Users/soulr/Downloads/sr_licences_deploiement_prod
    ou, côté Windows :
-   C:\Users\soulr\Downloads\sr_licences_deploiement
+   C:\Users\soulr\Downloads\sr_licences_deploiement_prod
 
-6. Côté distant, viser la racine du site de prod SR Licences.
+8. Côté distant, viser la racine du site de prod SR Licences.
 
-7. Copier uniquement les fichiers préparés vers la prod.
+9. Copier uniquement les fichiers préparés vers la prod.
 
 Points de vigilance
 -------------------
@@ -138,13 +189,21 @@ Points de vigilance
 - Ne pas supprimer .well-known/.
 - Ne pas supposer que le dossier de déploiement suffit pour une installation neuve.
 - Vérifier après envoi que l’application répond toujours correctement.
+- Se souvenir que l’IP WSL peut changer ; si besoin, mettre à jour le fichier hosts de Windows pour sr-licences-dev.local.
 
-Rappel utile
-------------
-Le dossier de déploiement est un dossier tampon de livraison.
-Il ne remplace pas le dépôt Git.
+Rappels utiles
+--------------
 Le dépôt Git reste la source de travail.
-Le dossier de déploiement sert uniquement à préparer ce qui doit partir en prod.
+L’instance Dev est la copie d’exécution locale.
+Le dossier de déploiement prod est un dossier tampon de livraison.
 
-8. BDD
-Pour voir les table de la BDD => mysql -u sylvere -p -e "USE sr_licences_dev; SHOW TABLES;"
+Commandes utiles
+----------------
+Voir les tables de la BDD Dev :
+mysql -u sylvere -p -e "USE sr_licences_dev; SHOW TABLES;"
+
+Tester l’API Dev :
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"module":"sr_merchant_flux","licence_key":"CLE_ICI","domain":"soulrebel-dev.local"}' \
+  http://sr-licences-dev.local/api/licence/check
