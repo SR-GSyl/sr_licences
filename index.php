@@ -13,8 +13,6 @@ use SrLicences\Http\Requete;
 
 $chemin = Requete::chemin();
 
-$config = require __DIR__ . '/config/config.php';
-
 $nomSession = (string)($config['session']['nom'] ?? 'SRLICSESSID');
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name($nomSession);

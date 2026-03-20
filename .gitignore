@@ -34,3 +34,6 @@ Thumbs.db
 
 # Spécifique prod / certificat
 .well-known/
+
+# Autres fichiers
+preparer_deploiement.sh
