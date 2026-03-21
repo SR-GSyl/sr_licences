@@ -102,6 +102,7 @@ final class ControleurAccueil
     .statut-invalide{background:#e5e7eb;color:#374151;border-color:#cbd5e1}
     .cellule-cle{min-width:220px}
     .cellule-domaine{min-width:170px}
+    .cellule-domaines-test{min-width:220px}
     .cellule-email{min-width:190px}
     .cellule-date{white-space:nowrap}
     .cellule-actions{min-width:220px}
@@ -229,6 +230,11 @@ final class ControleurAccueil
           </div>
 
           <div class="champ" style="grid-column:1/-1;">
+            <label for="domaines_test">Domaines de test</label>
+            <textarea id="domaines_test" name="domaines_test" placeholder="dev.exemple.com&#10;preprod.exemple.com&#10;ou séparés par virgules / point-virgules"></textarea>
+          </div>
+
+          <div class="champ" style="grid-column:1/-1;">
             <label for="commentaire_interne">Commentaire interne</label>
             <textarea id="commentaire_interne" name="commentaire_interne"></textarea>
           </div>
@@ -258,6 +264,7 @@ final class ControleurAccueil
                 <th>Client</th>
                 <th>E-mail</th>
                 <th>Domaine principal</th>
+                <th>Domaines de test</th>
                 <th>Version max</th>
                 <th>Date création</th>
                 <th>Date activation</th>
@@ -279,6 +286,7 @@ final class ControleurAccueil
                   <td><?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-email"><?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-domaine"><?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-domaines-test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td><?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -346,6 +354,7 @@ final class ControleurAccueil
                 'email_client' => (string)($_POST['email_client'] ?? ''),
                 'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
                 'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
                 'commentaire_interne' => (string)($_POST['commentaire_interne'] ?? ''),
             ]);
 

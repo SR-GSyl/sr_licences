@@ -214,6 +214,86 @@ final class LicenceRepository
         return $domaines;
     }
 
+    public function remplacerDomainesTestLicence(int $idLicence, array $domaines): void
+    {
+        $sqlSuppression = 'DELETE FROM sr_licence_domaine_test WHERE id_licence = :id_licence';
+        $stmtSuppression = $this->pdo->prepare($sqlSuppression);
+        $stmtSuppression->execute([
+            ':id_licence' => $idLicence,
+        ]);
+
+        if ($idLicence <= 0 || empty($domaines)) {
+            return;
+        }
+
+        $sqlInsertion = '
+            INSERT INTO sr_licence_domaine_test (
+                id_licence,
+                domaine,
+                actif,
+                date_creation
+            ) VALUES (
+                :id_licence,
+                :domaine,
+                1,
+                NOW()
+            )
+        ';
+
+        $stmtInsertion = $this->pdo->prepare($sqlInsertion);
+
+        foreach ($domaines as $domaine) {
+            $domaine = trim((string)$domaine);
+            if ($domaine === '') {
+                continue;
+            }
+
+            $stmtInsertion->execute([
+                ':id_licence' => $idLicence,
+                ':domaine' => $domaine,
+            ]);
+        }
+    }
+
+    public function obtenirDomainesTestActifsParLicences(array $idsLicence): array
+    {
+        $idsLicence = array_values(array_unique(array_map('intval', $idsLicence)));
+        $idsLicence = array_values(array_filter($idsLicence, static fn(int $id): bool => $id > 0));
+
+        if (empty($idsLicence)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($idsLicence), '?'));
+        $sql = "
+            SELECT id_licence, domaine
+            FROM sr_licence_domaine_test
+            WHERE actif = 1
+              AND id_licence IN ($placeholders)
+            ORDER BY id_licence ASC, domaine ASC
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($idsLicence);
+
+        $resultat = [];
+        foreach ($stmt->fetchAll() as $ligne) {
+            $idLicence = (int)($ligne['id_licence'] ?? 0);
+            $domaine = trim((string)($ligne['domaine'] ?? ''));
+            if ($idLicence <= 0 || $domaine === '') {
+                continue;
+            }
+
+            if (!isset($resultat[$idLicence])) {
+                $resultat[$idLicence] = [];
+            }
+
+            $resultat[$idLicence][] = $domaine;
+        }
+
+        return $resultat;
+    }
+
     private function normaliserNullable(mixed $valeur): ?string
     {
         $valeur = trim((string)$valeur);

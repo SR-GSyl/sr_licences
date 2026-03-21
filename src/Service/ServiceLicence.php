@@ -24,7 +24,30 @@ final class ServiceLicence
 
     public function obtenirLicencesTableauDeBord(int $limit = 100): array
     {
-        return $this->licenceRepository->listerLicences($limit);
+        $licences = $this->licenceRepository->listerLicences($limit);
+        if (empty($licences)) {
+            return [];
+        }
+
+        $idsLicence = [];
+        foreach ($licences as $licence) {
+            $idLicence = (int)($licence['id_licence'] ?? 0);
+            if ($idLicence > 0) {
+                $idsLicence[] = $idLicence;
+            }
+        }
+
+        $domainesParLicence = $this->licenceRepository->obtenirDomainesTestActifsParLicences($idsLicence);
+
+        foreach ($licences as &$licence) {
+            $idLicence = (int)($licence['id_licence'] ?? 0);
+            $domaines = $domainesParLicence[$idLicence] ?? [];
+            $licence['domaines_test_actifs'] = $domaines;
+            $licence['domaines_test_actifs_texte'] = implode(', ', $domaines);
+        }
+        unset($licence);
+
+        return $licences;
     }
 
     public function creerLicence(array $donnees): array
@@ -36,6 +59,7 @@ final class ServiceLicence
         $domainePrincipal = $this->normaliserDomaine((string)($donnees['domaine_principal'] ?? ''));
         $versionMax = trim((string)($donnees['version_max_autorisee'] ?? ''));
         $commentaire = trim((string)($donnees['commentaire_interne'] ?? ''));
+        $domainesTest = $this->extraireDomainesTest($donnees['domaines_test'] ?? '');
 
         if ($codeModule === '') {
             throw new InvalidArgumentException('Le code module est obligatoire.');
@@ -47,6 +71,13 @@ final class ServiceLicence
 
         if ($emailClient !== '' && filter_var($emailClient, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException('L’adresse e-mail fournie est invalide.');
+        }
+
+        if ($domainePrincipal !== '') {
+            $domainesTest = array_values(array_filter(
+                $domainesTest,
+                fn(string $domaine): bool => $domaine !== $domainePrincipal
+            ));
         }
 
         $cleLicence = $this->genererCleLicence($codeModule);
@@ -64,9 +95,12 @@ final class ServiceLicence
             'commentaire_interne' => $commentaire,
         ]);
 
+        $this->licenceRepository->remplacerDomainesTestLicence($idLicence, $domainesTest);
+
         return [
             'id_licence' => $idLicence,
             'cle_licence' => $cleLicence,
+            'domaines_test' => $domainesTest,
         ];
     }
 
@@ -192,6 +226,28 @@ final class ServiceLicence
             'signature_method' => 'none',
             'signature' => '',
         ];
+    }
+
+    private function extraireDomainesTest(mixed $valeur): array
+    {
+        $texte = trim((string)$valeur);
+        if ($texte === '') {
+            return [];
+        }
+
+        $elements = preg_split('/[\r\n,;]+/', $texte) ?: [];
+        $domaines = [];
+
+        foreach ($elements as $element) {
+            $domaine = $this->normaliserDomaine((string)$element);
+            if ($domaine !== '') {
+                $domaines[] = $domaine;
+            }
+        }
+
+        $domaines = array_values(array_unique($domaines));
+
+        return $domaines;
     }
 
     private function genererCleLicence(string $codeModule): string
