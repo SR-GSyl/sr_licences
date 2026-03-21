@@ -54,12 +54,15 @@ final class ServiceLicence
     {
         $codeModule = trim((string)($donnees['code_module'] ?? ''));
         $statut = trim((string)($donnees['statut'] ?? 'active'));
+        $typeLicence = trim((string)($donnees['type_licence'] ?? 'perpetuelle'));
         $nomClient = trim((string)($donnees['nom_client'] ?? ''));
         $emailClient = trim((string)($donnees['email_client'] ?? ''));
         $domainePrincipal = $this->normaliserDomaine((string)($donnees['domaine_principal'] ?? ''));
         $versionMax = trim((string)($donnees['version_max_autorisee'] ?? ''));
         $commentaire = trim((string)($donnees['commentaire_interne'] ?? ''));
         $domainesTest = $this->extraireDomainesTest($donnees['domaines_test'] ?? '');
+        $dateExpiration = $this->normaliserDateHeureNullable($donnees['date_expiration'] ?? null);
+        $graceJusquA = $this->normaliserDateHeureNullable($donnees['grace_jusqu_a'] ?? null);
 
         if ($codeModule === '') {
             throw new InvalidArgumentException('Le code module est obligatoire.');
@@ -67,6 +70,10 @@ final class ServiceLicence
 
         if (!in_array($statut, ['active', 'suspendue', 'revoquee', 'expiree', 'invalide'], true)) {
             throw new InvalidArgumentException('Le statut fourni est invalide.');
+        }
+
+        if (!in_array($typeLicence, ['perpetuelle', 'abonnement'], true)) {
+            throw new InvalidArgumentException('Le type de licence fourni est invalide.');
         }
 
         if ($emailClient !== '' && filter_var($emailClient, FILTER_VALIDATE_EMAIL) === false) {
@@ -80,6 +87,11 @@ final class ServiceLicence
             ));
         }
 
+        if ($typeLicence === 'perpetuelle') {
+            $dateExpiration = null;
+            $graceJusquA = null;
+        }
+
         $cleLicence = $this->genererCleLicence($codeModule);
         $dateActivation = $statut === 'active' ? date('Y-m-d H:i:s') : null;
 
@@ -87,11 +99,14 @@ final class ServiceLicence
             'cle_licence' => $cleLicence,
             'code_module' => $codeModule,
             'statut' => $statut,
+            'type_licence' => $typeLicence,
             'nom_client' => $nomClient,
             'email_client' => $emailClient,
             'domaine_principal' => $domainePrincipal,
             'version_max_autorisee' => $versionMax,
             'date_activation' => $dateActivation,
+            'date_expiration' => $dateExpiration,
+            'grace_jusqu_a' => $graceJusquA,
             'commentaire_interne' => $commentaire,
         ]);
 
@@ -100,6 +115,9 @@ final class ServiceLicence
         return [
             'id_licence' => $idLicence,
             'cle_licence' => $cleLicence,
+            'type_licence' => $typeLicence,
+            'date_expiration' => $dateExpiration,
+            'grace_jusqu_a' => $graceJusquA,
             'domaines_test' => $domainesTest,
         ];
     }
@@ -248,6 +266,20 @@ final class ServiceLicence
         $domaines = array_values(array_unique($domaines));
 
         return $domaines;
+    }
+
+    private function normaliserDateHeureNullable(mixed $valeur): ?string
+    {
+        $texte = trim((string)$valeur);
+        if ($texte === '') {
+            return null;
+        }
+
+        try {
+            return (new \DateTime($texte))->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            throw new InvalidArgumentException('Le format de date/heure fourni est invalide.');
+        }
     }
 
     private function genererCleLicence(string $codeModule): string

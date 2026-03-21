@@ -210,6 +210,14 @@ final class ControleurAccueil
           </div>
 
           <div class="champ">
+            <label for="type_licence">Type de licence</label>
+            <select id="type_licence" name="type_licence" required>
+              <option value="perpetuelle">perpétuelle</option>
+              <option value="abonnement">abonnement</option>
+            </select>
+          </div>
+
+          <div class="champ">
             <label for="nom_client">Nom client</label>
             <input type="text" id="nom_client" name="nom_client">
           </div>
@@ -229,6 +237,16 @@ final class ControleurAccueil
             <input type="text" id="version_max_autorisee" name="version_max_autorisee" placeholder="2.6.*">
           </div>
 
+          <div class="champ" id="bloc_date_expiration">
+            <label for="date_expiration">Date d’expiration</label>
+            <input type="datetime-local" id="date_expiration" name="date_expiration">
+          </div>
+
+          <div class="champ" id="bloc_grace_jusqu_a">
+            <label for="grace_jusqu_a">Fin de grâce</label>
+            <input type="datetime-local" id="grace_jusqu_a" name="grace_jusqu_a">
+          </div>
+
           <div class="champ" style="grid-column:1/-1;">
             <label for="domaines_test">Domaines de test</label>
             <textarea id="domaines_test" name="domaines_test" placeholder="dev.exemple.com&#10;preprod.exemple.com&#10;ou séparés par virgules / point-virgules"></textarea>
@@ -244,6 +262,35 @@ final class ControleurAccueil
           <button type="submit">Créer la licence</button>
         </div>
       </form>
+
+      <script>
+      (function () {
+        var selectType = document.getElementById('type_licence');
+        var blocExpiration = document.getElementById('bloc_date_expiration');
+        var blocGrace = document.getElementById('bloc_grace_jusqu_a');
+        var champExpiration = document.getElementById('date_expiration');
+        var champGrace = document.getElementById('grace_jusqu_a');
+
+        if (!selectType || !blocExpiration || !blocGrace || !champExpiration || !champGrace) {
+          return;
+        }
+
+        function mettreAJourVisibiliteDates() {
+          var estAbonnement = selectType.value === 'abonnement';
+
+          blocExpiration.style.display = estAbonnement ? '' : 'none';
+          blocGrace.style.display = estAbonnement ? '' : 'none';
+
+          if (!estAbonnement) {
+            champExpiration.value = '';
+            champGrace.value = '';
+          }
+        }
+
+        selectType.addEventListener('change', mettreAJourVisibiliteDates);
+        mettreAJourVisibiliteDates();
+      })();
+      </script>
     </div>
 
     <div class="bloc-liste">
@@ -350,10 +397,13 @@ final class ControleurAccueil
             $resultat = $service->creerLicence([
                 'code_module' => (string)($_POST['code_module'] ?? ''),
                 'statut' => (string)($_POST['statut'] ?? 'active'),
+                'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
                 'nom_client' => (string)($_POST['nom_client'] ?? ''),
                 'email_client' => (string)($_POST['email_client'] ?? ''),
                 'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
                 'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
+                'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
                 'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
                 'commentaire_interne' => (string)($_POST['commentaire_interne'] ?? ''),
             ]);

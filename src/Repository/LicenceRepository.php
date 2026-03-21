@@ -57,23 +57,29 @@ final class LicenceRepository
                 cle_licence,
                 code_module,
                 statut,
+                type_licence,
                 nom_client,
                 email_client,
                 domaine_principal,
                 version_max_autorisee,
                 date_creation,
                 date_activation,
+                date_expiration,
+                grace_jusqu_a,
                 commentaire_interne
             ) VALUES (
                 :cle_licence,
                 :code_module,
                 :statut,
+                :type_licence,
                 :nom_client,
                 :email_client,
                 :domaine_principal,
                 :version_max_autorisee,
                 NOW(),
                 :date_activation,
+                :date_expiration,
+                :grace_jusqu_a,
                 :commentaire_interne
             )
         ';
@@ -83,11 +89,14 @@ final class LicenceRepository
             ':cle_licence' => (string)($donnees['cle_licence'] ?? ''),
             ':code_module' => (string)($donnees['code_module'] ?? ''),
             ':statut' => (string)($donnees['statut'] ?? 'active'),
+            ':type_licence' => (string)($donnees['type_licence'] ?? 'perpetuelle'),
             ':nom_client' => $this->normaliserNullable($donnees['nom_client'] ?? null),
             ':email_client' => $this->normaliserNullable($donnees['email_client'] ?? null),
             ':domaine_principal' => $this->normaliserNullable($donnees['domaine_principal'] ?? null),
             ':version_max_autorisee' => $this->normaliserNullable($donnees['version_max_autorisee'] ?? null),
             ':date_activation' => !empty($donnees['date_activation']) ? (string)$donnees['date_activation'] : null,
+            ':date_expiration' => !empty($donnees['date_expiration']) ? (string)$donnees['date_expiration'] : null,
+            ':grace_jusqu_a' => !empty($donnees['grace_jusqu_a']) ? (string)$donnees['grace_jusqu_a'] : null,
             ':commentaire_interne' => $this->normaliserNullable($donnees['commentaire_interne'] ?? null),
         ]);
 
