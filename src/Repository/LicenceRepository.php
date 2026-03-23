@@ -167,6 +167,37 @@ final class LicenceRepository
         return is_array($ligne) ? $ligne : null;
     }
 
+    public function mettreAJourLicence(int $idLicence, array $donnees): void
+    {
+        $sql = '
+            UPDATE sr_licence
+            SET
+                type_licence = :type_licence,
+                nom_client = :nom_client,
+                email_client = :email_client,
+                domaine_principal = :domaine_principal,
+                version_max_autorisee = :version_max_autorisee,
+                date_expiration = :date_expiration,
+                grace_jusqu_a = :grace_jusqu_a,
+                commentaire_interne = :commentaire_interne,
+                date_maj = NOW()
+            WHERE id_licence = :id_licence
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':id_licence' => $idLicence,
+            ':type_licence' => (string)($donnees['type_licence'] ?? 'perpetuelle'),
+            ':nom_client' => $this->normaliserNullable($donnees['nom_client'] ?? null),
+            ':email_client' => $this->normaliserNullable($donnees['email_client'] ?? null),
+            ':domaine_principal' => $this->normaliserNullable($donnees['domaine_principal'] ?? null),
+            ':version_max_autorisee' => $this->normaliserNullable($donnees['version_max_autorisee'] ?? null),
+            ':date_expiration' => !empty($donnees['date_expiration']) ? (string)$donnees['date_expiration'] : null,
+            ':grace_jusqu_a' => !empty($donnees['grace_jusqu_a']) ? (string)$donnees['grace_jusqu_a'] : null,
+            ':commentaire_interne' => $this->normaliserNullable($donnees['commentaire_interne'] ?? null),
+        ]);
+    }
+
     public function licenceExiste(int $idLicence): bool
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM sr_licence WHERE id_licence = :id_licence');

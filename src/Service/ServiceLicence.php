@@ -141,6 +141,62 @@ final class ServiceLicence
         ];
     }
 
+    public function modifierLicence(int $idLicence, array $donnees): array
+    {
+        if ($idLicence <= 0) {
+            throw new InvalidArgumentException('Identifiant de licence invalide.');
+        }
+
+        if (!$this->licenceRepository->licenceExiste($idLicence)) {
+            throw new InvalidArgumentException('Licence introuvable.');
+        }
+
+        $typeLicence = trim((string)($donnees['type_licence'] ?? 'perpetuelle'));
+        $nomClient = trim((string)($donnees['nom_client'] ?? ''));
+        $emailClient = trim((string)($donnees['email_client'] ?? ''));
+        $domainePrincipal = $this->normaliserDomaine((string)($donnees['domaine_principal'] ?? ''));
+        $versionMax = trim((string)($donnees['version_max_autorisee'] ?? ''));
+        $commentaire = trim((string)($donnees['commentaire_interne'] ?? ''));
+        $domainesTest = $this->extraireDomainesTest($donnees['domaines_test'] ?? '');
+        $dateExpiration = $this->normaliserDateHeureNullable($donnees['date_expiration'] ?? null);
+        $graceJusquA = $this->normaliserDateHeureNullable($donnees['grace_jusqu_a'] ?? null);
+
+        if (!in_array($typeLicence, ['perpetuelle', 'abonnement'], true)) {
+            throw new InvalidArgumentException('Le type de licence fourni est invalide.');
+        }
+
+        if ($emailClient !== '' && filter_var($emailClient, FILTER_VALIDATE_EMAIL) === false) {
+            throw new InvalidArgumentException('L’adresse e-mail fournie est invalide.');
+        }
+
+        if ($domainePrincipal !== '') {
+            $domainesTest = array_values(array_filter(
+                $domainesTest,
+                fn(string $domaine): bool => $domaine !== $domainePrincipal
+            ));
+        }
+
+        if ($typeLicence === 'perpetuelle') {
+            $dateExpiration = null;
+            $graceJusquA = null;
+        }
+
+        $this->licenceRepository->mettreAJourLicence($idLicence, [
+            'type_licence' => $typeLicence,
+            'nom_client' => $nomClient,
+            'email_client' => $emailClient,
+            'domaine_principal' => $domainePrincipal,
+            'version_max_autorisee' => $versionMax,
+            'date_expiration' => $dateExpiration,
+            'grace_jusqu_a' => $graceJusquA,
+            'commentaire_interne' => $commentaire,
+        ]);
+
+        $this->licenceRepository->remplacerDomainesTestLicence($idLicence, $domainesTest);
+
+        return $this->obtenirLicencePourAdmin($idLicence);
+    }
+
     public function changerStatutLicence(int $idLicence, string $actionStatut): array
     {
         if ($idLicence <= 0) {

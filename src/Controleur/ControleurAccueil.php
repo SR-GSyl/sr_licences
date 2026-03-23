@@ -798,10 +798,258 @@ final class ControleurAccueil
       </div>
     </div>
 
-    <div class="bloc-retour">
+    <div class="bloc-retour" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a class="bouton-retour" href="/licences/modifier?id=<?php echo (int)($licence['id_licence'] ?? 0); ?>">Modifier la fiche</a>
       <a class="bouton-retour" href="/">Retour à la liste</a>
     </div>
   </div>
+</body>
+</html>
+        <?php
+        exit;
+    }
+
+    public function gererModificationLicence(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $csrfSession = (string)($_SESSION['sr_licences_csrf'] ?? '');
+            $csrfFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+            if ($csrfSession === '' || !hash_equals($csrfSession, $csrfFormulaire)) {
+                $_SESSION['sr_licences_message_erreur'] = 'Jeton de sécurité invalide.';
+                header('Location: /');
+                exit;
+            }
+
+            $idLicence = (int)($_POST['id_licence'] ?? 0);
+
+            try {
+                $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+                $service = new ServiceLicence(new LicenceRepository($pdo));
+                $service->modifierLicence($idLicence, [
+                    'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
+                    'nom_client' => (string)($_POST['nom_client'] ?? ''),
+                    'email_client' => (string)($_POST['email_client'] ?? ''),
+                    'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
+                    'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                    'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
+                    'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
+                    'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
+                    'commentaire_interne' => (string)($_POST['commentaire_interne'] ?? ''),
+                ]);
+
+                $_SESSION['sr_licences_message_succes'] = 'Licence #' . $idLicence . ' modifiée avec succès.';
+                header('Location: /licences/voir?id=' . $idLicence);
+                exit;
+            } catch (Throwable $e) {
+                $_SESSION['sr_licences_message_erreur'] = 'Modification impossible : ' . $e->getMessage();
+                header('Location: /licences/modifier?id=' . $idLicence);
+                exit;
+            }
+        }
+
+        $idLicence = (int)($_GET['id'] ?? 0);
+        $messageSucces = (string)($_SESSION['sr_licences_message_succes'] ?? '');
+        $messageErreur = (string)($_SESSION['sr_licences_message_erreur'] ?? '');
+        unset($_SESSION['sr_licences_message_succes'], $_SESSION['sr_licences_message_erreur']);
+
+        try {
+            if (empty($_SESSION['sr_licences_csrf'])) {
+                $_SESSION['sr_licences_csrf'] = bin2hex(random_bytes(16));
+            }
+
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceLicence(new LicenceRepository($pdo));
+            $licence = $service->obtenirLicencePourAdmin($idLicence);
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Chargement impossible : ' . $e->getMessage();
+            header('Location: /');
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Modifier la licence #<?php echo (int)($licence['id_licence'] ?? 0); ?> - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f8fafc;color:#111827}
+    .page{max-width:1180px;margin:32px auto;background:#fff;border:1px solid #dbe3ea;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+    .barre{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .badge-statut{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px;line-height:1.2;white-space:nowrap}
+    .statut-active{background:#dcfce7;color:#166534;border-color:#86efac}
+    .statut-suspendue{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+    .statut-revoquee{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .statut-expiree{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+    .statut-invalide{background:#e5e7eb;color:#374151;border-color:#cbd5e1}
+    .grille-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:18px}
+    .carte-info{border:1px solid #dbe3ea;border-radius:14px;padding:16px;background:#fff}
+    .libelle{margin:0 0 8px 0;font-size:13px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.02em}
+    .contenu{font-size:16px;line-height:1.45;word-break:break-word}
+    .contenu code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
+    .formulaire{margin-top:22px;padding:18px;border:1px solid #dbe3ea;border-radius:14px;background:#fff}
+    .grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .champ label{display:block;margin:0 0 6px 0;font-weight:700}
+    .champ input,.champ select,.champ textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    .champ textarea{min-height:130px;resize:vertical}
+    .bloc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .bouton-principal,.bouton-secondaire{display:inline-block;padding:11px 14px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer}
+    .bouton-principal{border:0;background:#111827;color:#fff}
+    .bouton-secondaire{border:1px solid #cbd5e1;background:#fff;color:#111827}
+    .alerte-ok{margin:16px 0;padding:12px 14px;border-radius:12px;background:#ecfdf5;color:#166534;border:1px solid #86efac}
+    .alerte-ko{margin:16px 0;padding:12px 14px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .muted{color:#4b5563}
+    .champ-dates-abonnement{display:block}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="barre">
+      <div>
+        <h1 style="margin:0 0 8px 0;">Modifier la licence #<?php echo (int)($licence['id_licence'] ?? 0); ?></h1>
+        <p class="muted" style="margin:0;">Modification des champs métiers utiles pour les tests et la gestion.</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a class="bouton-secondaire" href="/licences/voir?id=<?php echo (int)($licence['id_licence'] ?? 0); ?>">Retour à la fiche</a>
+        <a class="bouton-secondaire" href="/">Retour à la liste</a>
+      </div>
+    </div>
+
+    <?php if ($messageSucces !== ''): ?>
+      <div class="alerte-ok"><?php echo htmlspecialchars($messageSucces, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <?php if ($messageErreur !== ''): ?>
+      <div class="alerte-ko"><?php echo htmlspecialchars($messageErreur, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <?php $statut = (string)($licence['statut'] ?? ''); ?>
+
+    <div class="grille-info">
+      <div class="carte-info">
+        <div class="libelle">Clé de licence</div>
+        <div class="contenu"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
+      </div>
+      <div class="carte-info">
+        <div class="libelle">Module</div>
+        <div class="contenu"><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
+      </div>
+      <div class="carte-info">
+        <div class="libelle">Statut</div>
+        <div class="contenu">
+          <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatut($statut), ENT_QUOTES, 'UTF-8'); ?>">
+            <?php echo htmlspecialchars($statut !== '' ? $statut : '—', ENT_QUOTES, 'UTF-8'); ?>
+          </span>
+        </div>
+      </div>
+      <div class="carte-info">
+        <div class="libelle">Date création</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+      <div class="carte-info">
+        <div class="libelle">Date activation</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+    </div>
+
+    <div class="formulaire">
+      <form method="post" action="/licences/modifier">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="id_licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>">
+
+        <div class="grille-form">
+          <div class="champ">
+            <label for="type_licence">Type de licence</label>
+            <select id="type_licence" name="type_licence" required>
+              <option value="perpetuelle" <?php echo (($licence['type_licence'] ?? '') === 'perpetuelle') ? 'selected' : ''; ?>>perpetuelle</option>
+              <option value="abonnement" <?php echo (($licence['type_licence'] ?? '') === 'abonnement') ? 'selected' : ''; ?>>abonnement</option>
+            </select>
+          </div>
+
+          <div class="champ">
+            <label for="nom_client">Nom client</label>
+            <input type="text" id="nom_client" name="nom_client" value="<?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="email_client">E-mail client</label>
+            <input type="email" id="email_client" name="email_client" value="<?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="domaine_principal">Domaine principal</label>
+            <input type="text" id="domaine_principal" name="domaine_principal" value="<?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="version_max_autorisee">Version max autorisée</label>
+            <input type="text" id="version_max_autorisee" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ champ-dates-abonnement">
+            <label for="date_expiration">Date d’expiration</label>
+            <input type="datetime-local" id="date_expiration" name="date_expiration" value="<?php echo htmlspecialchars(((string)($licence['date_expiration'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['date_expiration'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ champ-dates-abonnement">
+            <label for="grace_jusqu_a">Fin de grâce</label>
+            <input type="datetime-local" id="grace_jusqu_a" name="grace_jusqu_a" value="<?php echo htmlspecialchars(((string)($licence['grace_jusqu_a'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['grace_jusqu_a'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+          <div class="champ" style="grid-column:1/-1;">
+            <label for="domaines_test">Domaines de test</label>
+            <textarea id="domaines_test" name="domaines_test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+          </div>
+
+          <div class="champ" style="grid-column:1/-1;">
+            <label for="commentaire_interne">Commentaire interne</label>
+            <textarea id="commentaire_interne" name="commentaire_interne"><?php echo htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+          </div>
+        </div>
+
+        <div class="bloc-actions">
+          <button type="submit" class="bouton-principal">Enregistrer les modifications</button>
+          <a class="bouton-secondaire" href="/licences/voir?id=<?php echo (int)($licence['id_licence'] ?? 0); ?>">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var selectType = document.getElementById('type_licence');
+    var champExpiration = document.getElementById('date_expiration');
+    var champGrace = document.getElementById('grace_jusqu_a');
+
+    if (!selectType || !champExpiration || !champGrace) {
+      return;
+    }
+
+    function mettreAJourVisibiliteDates() {
+      var abonnement = selectType.value === 'abonnement';
+      var blocExpiration = champExpiration.closest('.champ');
+      var blocGrace = champGrace.closest('.champ');
+
+      if (blocExpiration) {
+        blocExpiration.style.display = abonnement ? '' : 'none';
+      }
+      if (blocGrace) {
+        blocGrace.style.display = abonnement ? '' : 'none';
+      }
+
+      if (!abonnement) {
+        champExpiration.value = '';
+        champGrace.value = '';
+      }
+    }
+
+    selectType.addEventListener('change', mettreAJourVisibiliteDates);
+    mettreAJourVisibiliteDates();
+  })();
+  </script>
 </body>
 </html>
         <?php

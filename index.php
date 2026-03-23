@@ -122,6 +122,11 @@ switch ($chemin) {
     case '/licences/voir':
         (new ControleurAccueil($config))->afficherLicence();
         break;
+
+    case '/licences/modifier':
+        (new ControleurAccueil($config))->gererModificationLicence();
+        break;
+
     case '/licences/statut-lot':
         (new ControleurAccueil($config))->traiterChangementStatutLicencesLot();
         break;
