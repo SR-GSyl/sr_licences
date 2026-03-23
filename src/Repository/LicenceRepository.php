@@ -113,12 +113,17 @@ final class LicenceRepository
                 cle_licence,
                 code_module,
                 statut,
+                type_licence,
                 nom_client,
                 email_client,
                 domaine_principal,
                 version_max_autorisee,
                 date_creation,
-                date_activation
+                date_activation,
+                date_expiration,
+                grace_jusqu_a,
+                date_maj,
+                commentaire_interne
              FROM sr_licence
              ORDER BY id_licence DESC
              LIMIT %d',

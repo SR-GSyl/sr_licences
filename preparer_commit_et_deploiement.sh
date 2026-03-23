@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# ./preparer_commit_et_deploiement.sh
 set -euo pipefail
 
 DOSSIER_DEPOT="/home/sylvere/Git_depot_local/sr_licences"

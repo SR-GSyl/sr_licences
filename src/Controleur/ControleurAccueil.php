@@ -112,6 +112,13 @@ final class ControleurAccueil
     .btn-reactiver{background:#166534;color:#fff}
     .btn-suspendre{background:#b45309;color:#fff}
     .btn-revoquer{background:#b91c1c;color:#fff}
+    .barre-filtres-liste{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0 14px 0;padding:14px;border:1px solid #dbe3ea;border-radius:12px;background:#f8fafc}
+    .champ-filtre label{display:block;margin-bottom:6px;font-weight:700;font-size:13px}
+    .champ-filtre input,.champ-filtre select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    .actions-filtres{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+    .btn-secondaire{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#111827;font-weight:700;cursor:pointer}
+    .resume-filtres{margin:0 0 10px 0;color:#4b5563;font-size:13px}
+    .ligne-masquee{display:none}
   </style>
 </head>
 <body>
@@ -300,8 +307,45 @@ final class ControleurAccueil
       <?php if (empty($licences)): ?>
         <p class="muted">Aucune licence enregistrée pour le moment.</p>
       <?php else: ?>
+        <div class="barre-filtres-liste" id="barre-filtres-licences">
+          <div class="champ-filtre">
+            <label for="filtre_licence_recherche">Recherche libre</label>
+            <input type="text" id="filtre_licence_recherche" placeholder="Clé, client, e-mail, commentaire...">
+          </div>
+          <div class="champ-filtre">
+            <label for="filtre_licence_statut">Statut</label>
+            <select id="filtre_licence_statut">
+              <option value="">Tous</option>
+              <option value="active">active</option>
+              <option value="suspendue">suspendue</option>
+              <option value="revoquee">revoquee</option>
+              <option value="expiree">expiree</option>
+              <option value="invalide">invalide</option>
+            </select>
+          </div>
+          <div class="champ-filtre">
+            <label for="filtre_licence_type">Type</label>
+            <select id="filtre_licence_type">
+              <option value="">Tous</option>
+              <option value="perpetuelle">perpetuelle</option>
+              <option value="abonnement">abonnement</option>
+            </select>
+          </div>
+          <div class="champ-filtre">
+            <label for="filtre_licence_module">Module</label>
+            <input type="text" id="filtre_licence_module" placeholder="sr_merchant_flux">
+          </div>
+          <div class="champ-filtre">
+            <label for="filtre_licence_domaine">Domaine</label>
+            <input type="text" id="filtre_licence_domaine" placeholder="exemple.com">
+          </div>
+          <div class="actions-filtres">
+            <button type="button" class="btn-secondaire" id="btn_reinit_filtres_licences">Réinitialiser</button>
+          </div>
+        </div>
+        <p class="resume-filtres" id="resume_filtres_licences"></p>
         <div class="table-wrap">
-          <table>
+          <table id="tableau-licences">
             <thead>
               <tr>
                 <th>ID</th>
@@ -313,6 +357,11 @@ final class ControleurAccueil
                 <th>Domaine principal</th>
                 <th>Domaines de test</th>
                 <th>Version max</th>
+                <th>Type</th>
+                <th>Expire le</th>
+                <th>Fin de grâce</th>
+                <th>Mise à jour</th>
+                <th>Commentaire interne</th>
                 <th>Date création</th>
                 <th>Date activation</th>
                 <th>Actions</th>
@@ -321,7 +370,26 @@ final class ControleurAccueil
             <tbody>
               <?php foreach ($licences as $licence): ?>
                 <?php $statut = (string)($licence['statut'] ?? ''); ?>
-                <tr>
+                <tr
+                  class="ligne-licence"
+                  data-filtre-global="<?php echo htmlspecialchars(implode(' ', [
+                      (string)($licence['id_licence'] ?? ''),
+                      (string)($licence['cle_licence'] ?? ''),
+                      (string)($licence['code_module'] ?? ''),
+                      (string)($licence['statut'] ?? ''),
+                      (string)($licence['nom_client'] ?? ''),
+                      (string)($licence['email_client'] ?? ''),
+                      (string)($licence['domaine_principal'] ?? ''),
+                      (string)($licence['domaines_test_actifs_texte'] ?? ''),
+                      (string)($licence['version_max_autorisee'] ?? ''),
+                      (string)($licence['type_licence'] ?? ''),
+                      (string)($licence['commentaire_interne'] ?? '')
+                  ]), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-statut="<?php echo htmlspecialchars((string)($licence['statut'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-type="<?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-module="<?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-domaine="<?php echo htmlspecialchars(trim((string)($licence['domaine_principal'] ?? '') . ' ' . (string)($licence['domaines_test_actifs_texte'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"
+                >
                   <td><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
                   <td class="cellule-cle"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                   <td><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
@@ -335,6 +403,11 @@ final class ControleurAccueil
                   <td class="cellule-domaine"><?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-domaines-test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td><?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-actions">
@@ -363,6 +436,84 @@ final class ControleurAccueil
             </tbody>
           </table>
         </div>
+        <script>
+        (function () {
+          var champRecherche = document.getElementById('filtre_licence_recherche');
+          var champStatut = document.getElementById('filtre_licence_statut');
+          var champType = document.getElementById('filtre_licence_type');
+          var champModule = document.getElementById('filtre_licence_module');
+          var champDomaine = document.getElementById('filtre_licence_domaine');
+          var boutonReset = document.getElementById('btn_reinit_filtres_licences');
+          var resume = document.getElementById('resume_filtres_licences');
+          var lignes = document.querySelectorAll('#tableau-licences tbody tr.ligne-licence');
+
+          if (!champRecherche || !champStatut || !champType || !champModule || !champDomaine || !boutonReset || !resume || !lignes.length) {
+            return;
+          }
+
+          function normaliser(valeur) {
+            return (valeur || '').toString().toLowerCase().trim();
+          }
+
+          function appliquerFiltres() {
+            var recherche = normaliser(champRecherche.value);
+            var statut = normaliser(champStatut.value);
+            var type = normaliser(champType.value);
+            var module = normaliser(champModule.value);
+            var domaine = normaliser(champDomaine.value);
+            var visibles = 0;
+
+            lignes.forEach(function (ligne) {
+              var filtreGlobal = normaliser(ligne.getAttribute('data-filtre-global'));
+              var filtreStatut = normaliser(ligne.getAttribute('data-filtre-statut'));
+              var filtreType = normaliser(ligne.getAttribute('data-filtre-type'));
+              var filtreModule = normaliser(ligne.getAttribute('data-filtre-module'));
+              var filtreDomaine = normaliser(ligne.getAttribute('data-filtre-domaine'));
+
+              var ok = true;
+
+              if (recherche !== '' && filtreGlobal.indexOf(recherche) === -1) {
+                ok = false;
+              }
+              if (ok && statut !== '' && filtreStatut !== statut) {
+                ok = false;
+              }
+              if (ok && type !== '' && filtreType !== type) {
+                ok = false;
+              }
+              if (ok && module !== '' && filtreModule.indexOf(module) === -1) {
+                ok = false;
+              }
+              if (ok && domaine !== '' && filtreDomaine.indexOf(domaine) === -1) {
+                ok = false;
+              }
+
+              ligne.classList.toggle('ligne-masquee', !ok);
+              if (ok) {
+                visibles += 1;
+              }
+            });
+
+            resume.textContent = visibles + ' licence(s) affichée(s) sur ' + lignes.length + '.';
+          }
+
+          [champRecherche, champStatut, champType, champModule, champDomaine].forEach(function (champ) {
+            champ.addEventListener('input', appliquerFiltres);
+            champ.addEventListener('change', appliquerFiltres);
+          });
+
+          boutonReset.addEventListener('click', function () {
+            champRecherche.value = '';
+            champStatut.value = '';
+            champType.value = '';
+            champModule.value = '';
+            champDomaine.value = '';
+            appliquerFiltres();
+          });
+
+          appliquerFiltres();
+        })();
+        </script>
       <?php endif; ?>
     </div>
   </div>
