@@ -50,6 +50,25 @@ final class ServiceLicence
         return $licences;
     }
 
+    public function obtenirLicencePourAdmin(int $idLicence): array
+    {
+        if ($idLicence <= 0) {
+            throw new InvalidArgumentException('Identifiant de licence invalide.');
+        }
+
+        $licence = $this->licenceRepository->trouverLicenceParId($idLicence);
+
+        if ($licence === null) {
+            throw new InvalidArgumentException('Licence introuvable.');
+        }
+
+        $domaines = $this->licenceRepository->obtenirDomainesTestActifs($idLicence);
+        $licence['domaines_test_actifs'] = $domaines;
+        $licence['domaines_test_actifs_texte'] = implode(', ', $domaines);
+
+        return $licence;
+    }
+
     public function creerLicence(array $donnees): array
     {
         $codeModule = trim((string)($donnees['code_module'] ?? ''));

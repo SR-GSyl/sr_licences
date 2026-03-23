@@ -112,6 +112,18 @@ final class ControleurAccueil
     .btn-reactiver{background:#166534;color:#fff}
     .btn-suspendre{background:#b45309;color:#fff}
     .btn-revoquer{background:#b91c1c;color:#fff}
+    .btn-voir{display:inline-block;padding:7px 10px;border:0;border-radius:8px;font-size:12px;font-weight:700;background:#1d4ed8;color:#fff;text-decoration:none;line-height:1.2}
+    .bloc-actions-lot{margin:0 0 14px 0;padding:14px;border:1px solid #dbe3ea;border-radius:12px;background:#f8fafc}
+    .barre-actions-lot{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .barre-actions-lot select{padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    .btn-appliquer-lot{padding:10px 14px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:700;cursor:pointer}
+    .resume-selection{color:#4b5563;font-size:13px;font-weight:700}
+    .colonne-selection{position:sticky;left:0;background:#fff;z-index:2;min-width:112px;width:112px;white-space:nowrap;box-shadow:1px 0 0 #e5e7eb}
+    th.colonne-selection{background:#f8fafc;z-index:5}
+    th.colonne-selection,td.colonne-selection{padding-right:8px}
+    .ligne-selection{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .checkbox-ligne-licence,.checkbox-toutes-licences{width:18px;height:18px;cursor:pointer}
+    .etiquette-tout-selectionner{display:inline-flex;align-items:center;gap:8px;font-weight:700}
     .barre-filtres-liste{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0 14px 0;padding:14px;border:1px solid #dbe3ea;border-radius:12px;background:#f8fafc}
     .champ-filtre label{display:block;margin-bottom:6px;font-weight:700;font-size:13px}
     .champ-filtre input,.champ-filtre select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
@@ -344,10 +356,33 @@ final class ControleurAccueil
           </div>
         </div>
         <p class="resume-filtres" id="resume_filtres_licences"></p>
+        <div class="bloc-actions-lot">
+          <form method="post" action="/licences/statut-lot" id="form_actions_licences_lot">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="barre-actions-lot">
+              <label class="etiquette-tout-selectionner" for="cocher_toutes_licences">
+                <input type="checkbox" id="cocher_toutes_licences" class="checkbox-toutes-licences">
+                <span>Tout sélectionner (visibles)</span>
+              </label>
+
+              <select name="action_statut_lot" id="action_statut_lot">
+                <option value="">Choisir une action</option>
+                <option value="reactiver">Réactiver</option>
+                <option value="suspendre">Suspendre</option>
+                <option value="revoquer">Révoquer</option>
+              </select>
+
+              <button type="submit" class="btn-appliquer-lot">Appliquer</button>
+              <span class="resume-selection" id="resume_selection_licences">0 licence sélectionnée.</span>
+            </div>
+            <div id="ids_licence_selectionnes"></div>
+          </form>
+        </div>
         <div class="table-wrap">
           <table id="tableau-licences">
-            <thead>
+                        <thead>
               <tr>
+                <th class="colonne-selection">Sélection / Voir</th>
                 <th>ID</th>
                 <th>Clé</th>
                 <th>Module</th>
@@ -364,7 +399,6 @@ final class ControleurAccueil
                 <th>Commentaire interne</th>
                 <th>Date création</th>
                 <th>Date activation</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -390,6 +424,12 @@ final class ControleurAccueil
                   data-filtre-module="<?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
                   data-filtre-domaine="<?php echo htmlspecialchars(trim((string)($licence['domaine_principal'] ?? '') . ' ' . (string)($licence['domaines_test_actifs_texte'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>"
                 >
+                  <td class="colonne-selection">
+                    <div class="ligne-selection">
+                      <input type="checkbox" class="checkbox-ligne-licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>" aria-label="Sélectionner la licence #<?php echo (int)($licence['id_licence'] ?? 0); ?>">
+                      <a class="btn-voir" href="/licences/voir?id=<?php echo (int)($licence['id_licence'] ?? 0); ?>">Voir</a>
+                    </div>
+                  </td>
                   <td><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
                   <td class="cellule-cle"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
                   <td><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
@@ -410,28 +450,7 @@ final class ControleurAccueil
                   <td><?php echo nl2br(htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-actions">
-                    <div class="actions-ligne">
-                      <form method="post" action="/licences/statut">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
-                        <input type="hidden" name="id_licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>">
-                        <button class="btn-mini btn-reactiver" type="submit" name="action_statut" value="reactiver">Réactiver</button>
-                      </form>
-
-                      <form method="post" action="/licences/statut">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
-                        <input type="hidden" name="id_licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>">
-                        <button class="btn-mini btn-suspendre" type="submit" name="action_statut" value="suspendre">Suspendre</button>
-                      </form>
-
-                      <form method="post" action="/licences/statut">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
-                        <input type="hidden" name="id_licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>">
-                        <button class="btn-mini btn-revoquer" type="submit" name="action_statut" value="revoquer">Révoquer</button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
+</tr>
               <?php endforeach; ?>
             </tbody>
           </table>
@@ -517,6 +536,272 @@ final class ControleurAccueil
       <?php endif; ?>
     </div>
   </div>
+
+  <script>
+  (function () {
+    var formulaireLot = document.getElementById('form_actions_licences_lot');
+    if (!formulaireLot) {
+      return;
+    }
+
+    var cases = Array.prototype.slice.call(document.querySelectorAll('.checkbox-ligne-licence'));
+    var caseToutes = document.getElementById('cocher_toutes_licences');
+    var selectAction = document.getElementById('action_statut_lot');
+    var resumeSelection = document.getElementById('resume_selection_licences');
+    var conteneurIds = document.getElementById('ids_licence_selectionnes');
+
+    if (!cases.length || !caseToutes || !selectAction || !resumeSelection || !conteneurIds) {
+      return;
+    }
+
+    function ligneVisible(caseACocher) {
+      var ligne = caseACocher.closest('tr');
+      return !ligne || !ligne.classList.contains('ligne-masquee');
+    }
+
+    function casesVisibles() {
+      return cases.filter(function (caseACocher) {
+        return ligneVisible(caseACocher);
+      });
+    }
+
+    function casesCochees() {
+      return cases.filter(function (caseACocher) {
+        return caseACocher.checked;
+      });
+    }
+
+    function mettreAJourResumeSelection() {
+      var visibles = casesVisibles();
+      var visiblesCochees = visibles.filter(function (caseACocher) {
+        return caseACocher.checked;
+      });
+      var totalCochees = casesCochees().length;
+
+      caseToutes.checked = visibles.length > 0 && visiblesCochees.length === visibles.length;
+      caseToutes.indeterminate = visiblesCochees.length > 0 && visiblesCochees.length < visibles.length;
+
+      resumeSelection.textContent = totalCochees + ' licence(s) sélectionnée(s).';
+    }
+
+    caseToutes.addEventListener('change', function () {
+      var cocher = caseToutes.checked;
+      casesVisibles().forEach(function (caseACocher) {
+        caseACocher.checked = cocher;
+      });
+      mettreAJourResumeSelection();
+    });
+
+    cases.forEach(function (caseACocher) {
+      caseACocher.addEventListener('change', mettreAJourResumeSelection);
+    });
+
+    ['filtre_licence_recherche', 'filtre_licence_statut', 'filtre_licence_type', 'filtre_licence_module', 'filtre_licence_domaine'].forEach(function (idChamp) {
+      var champ = document.getElementById(idChamp);
+      if (!champ) {
+        return;
+      }
+      champ.addEventListener('input', mettreAJourResumeSelection);
+      champ.addEventListener('change', mettreAJourResumeSelection);
+    });
+
+    formulaireLot.addEventListener('submit', function (event) {
+      var selection = casesCochees().map(function (caseACocher) {
+        return caseACocher.value;
+      });
+
+      if (!selection.length) {
+        event.preventDefault();
+        alert('Coche au moins une licence avant d’appliquer une action.');
+        return;
+      }
+
+      if (!selectAction.value) {
+        event.preventDefault();
+        alert('Choisis une action avant de valider.');
+        return;
+      }
+
+      var libelleAction = selectAction.options[selectAction.selectedIndex].text || selectAction.value;
+      if (!window.confirm('Confirmer l’action « ' + libelleAction + ' » sur ' + selection.length + ' licence(s) ?')) {
+        event.preventDefault();
+        return;
+      }
+
+      conteneurIds.innerHTML = '';
+      selection.forEach(function (idLicence) {
+        var champ = document.createElement('input');
+        champ.type = 'hidden';
+        champ.name = 'ids_licence[]';
+        champ.value = idLicence;
+        conteneurIds.appendChild(champ);
+      });
+    });
+
+    mettreAJourResumeSelection();
+  })();
+  </script>
+
+</body>
+</html>
+        <?php
+        exit;
+    }
+
+
+    public function afficherLicence(): void
+    {
+        $idLicence = (int)($_GET['id'] ?? 0);
+
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceLicence(new LicenceRepository($pdo));
+            $licence = $service->obtenirLicencePourAdmin($idLicence);
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Consultation impossible : ' . $e->getMessage();
+            header('Location: /');
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Fiche licence #<?php echo (int)($licence['id_licence'] ?? 0); ?> - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f8fafc;color:#111827}
+    .page{max-width:1180px;margin:32px auto;background:#fff;border:1px solid #dbe3ea;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+    .barre{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .badge-statut{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px;line-height:1.2;white-space:nowrap}
+    .statut-active{background:#dcfce7;color:#166534;border-color:#86efac}
+    .statut-suspendue{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+    .statut-revoquee{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .statut-expiree{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+    .statut-invalide{background:#e5e7eb;color:#374151;border-color:#cbd5e1}
+    .grille-fiche{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:20px}
+    .carte-fiche{border:1px solid #dbe3ea;border-radius:14px;padding:16px;background:#fff}
+    .libelle{margin:0 0 8px 0;font-size:13px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.02em}
+    .contenu{font-size:16px;line-height:1.45;word-break:break-word}
+    .contenu code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
+    .contenu.commentaire{white-space:pre-wrap}
+    .bloc-retour{margin-top:22px}
+    a.bouton-retour{display:inline-block;padding:10px 14px;border-radius:10px;background:#111827;color:#fff;text-decoration:none;font-weight:700}
+    .muted{color:#4b5563}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="barre">
+      <div>
+        <h1 style="margin:0 0 8px 0;">Fiche licence #<?php echo (int)($licence['id_licence'] ?? 0); ?></h1>
+        <p class="muted" style="margin:0;">Consultation détaillée d’une licence enregistrée.</p>
+      </div>
+      <div>
+        <a class="bouton-retour" href="/">Retour à la liste</a>
+      </div>
+    </div>
+
+    <?php $statut = (string)($licence['statut'] ?? ''); ?>
+    <?php $typeLicence = (string)($licence['type_licence'] ?? ''); ?>
+    <?php $typeLicenceLibelle = match ($typeLicence) {
+        'perpetuelle' => 'perpétuelle',
+        'abonnement' => 'abonnement',
+        default => ($typeLicence !== '' ? $typeLicence : '—'),
+    }; ?>
+
+    <div class="grille-fiche">
+      <div class="carte-fiche">
+        <div class="libelle">ID</div>
+        <div class="contenu"><?php echo (int)($licence['id_licence'] ?? 0); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Clé de licence</div>
+        <div class="contenu"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Module</div>
+        <div class="contenu"><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Statut</div>
+        <div class="contenu">
+          <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatut($statut), ENT_QUOTES, 'UTF-8'); ?>">
+            <?php echo htmlspecialchars($statut !== '' ? $statut : '—', ENT_QUOTES, 'UTF-8'); ?>
+          </span>
+        </div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Type de licence</div>
+        <div class="contenu"><?php echo htmlspecialchars($typeLicenceLibelle, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Nom client</div>
+        <div class="contenu"><?php echo htmlspecialchars((string)($licence['nom_client'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">E-mail client</div>
+        <div class="contenu"><?php echo htmlspecialchars((string)($licence['email_client'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Domaine principal</div>
+        <div class="contenu"><?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Domaines de test</div>
+        <div class="contenu"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Version max autorisée</div>
+        <div class="contenu"><?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Date de création</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Date d’activation</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Date d’expiration</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Fin de grâce</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Dernière mise à jour</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche" style="grid-column:1/-1;">
+        <div class="libelle">Commentaire interne</div>
+        <div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div>
+      </div>
+    </div>
+
+    <div class="bloc-retour">
+      <a class="bouton-retour" href="/">Retour à la liste</a>
+    </div>
+  </div>
 </body>
 </html>
         <?php
@@ -563,6 +848,67 @@ final class ControleurAccueil
                 'Licence créée avec succès. Clé : ' . (string)($resultat['cle_licence'] ?? '');
         } catch (Throwable $e) {
             $_SESSION['sr_licences_message_erreur'] = 'Création impossible : ' . $e->getMessage();
+        }
+
+        header('Location: /');
+        exit;
+    }
+
+    public function traiterChangementStatutLicencesLot(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo '405 - Méthode non autorisée';
+            exit;
+        }
+
+        $csrfSession = (string)($_SESSION['sr_licences_csrf'] ?? '');
+        $csrfFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfFormulaire)) {
+            $_SESSION['sr_licences_message_erreur'] = 'Jeton de sécurité invalide.';
+            header('Location: /');
+            exit;
+        }
+
+        try {
+            $actionStatut = (string)($_POST['action_statut_lot'] ?? '');
+            $idsBruts = $_POST['ids_licence'] ?? [];
+
+            if (!is_array($idsBruts)) {
+                $idsBruts = [$idsBruts];
+            }
+
+            $idsLicence = [];
+            foreach ($idsBruts as $idBrut) {
+                $id = (int)$idBrut;
+                if ($id > 0) {
+                    $idsLicence[] = $id;
+                }
+            }
+
+            $idsLicence = array_values(array_unique($idsLicence));
+
+            if (empty($idsLicence)) {
+                throw new \InvalidArgumentException('Aucune licence sélectionnée.');
+            }
+
+            if (!in_array($actionStatut, ['reactiver', 'suspendre', 'revoquer'], true)) {
+                throw new \InvalidArgumentException('Action de statut invalide.');
+            }
+
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceLicence(new LicenceRepository($pdo));
+
+            foreach ($idsLicence as $idLicence) {
+                $service->changerStatutLicence($idLicence, $actionStatut);
+            }
+
+            $_SESSION['sr_licences_message_succes'] =
+                count($idsLicence) . ' licence(s) mise(s) à jour via l’action "' . $actionStatut . '".';
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Modification en lot impossible : ' . $e->getMessage();
         }
 
         header('Location: /');

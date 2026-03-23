@@ -133,6 +133,40 @@ final class LicenceRepository
         return $this->pdo->query($sql)->fetchAll();
     }
 
+    public function trouverLicenceParId(int $idLicence): ?array
+    {
+        $sql = '
+            SELECT
+                id_licence,
+                cle_licence,
+                code_module,
+                statut,
+                type_licence,
+                nom_client,
+                email_client,
+                domaine_principal,
+                version_max_autorisee,
+                date_creation,
+                date_activation,
+                date_expiration,
+                grace_jusqu_a,
+                date_maj,
+                commentaire_interne
+            FROM sr_licence
+            WHERE id_licence = :id_licence
+            LIMIT 1
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':id_licence' => $idLicence,
+        ]);
+
+        $ligne = $stmt->fetch();
+
+        return is_array($ligne) ? $ligne : null;
+    }
+
     public function licenceExiste(int $idLicence): bool
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM sr_licence WHERE id_licence = :id_licence');
