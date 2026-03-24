@@ -256,13 +256,43 @@ final class ControleurAccueil
             <input type="text" id="version_max_autorisee" name="version_max_autorisee" placeholder="2.6.*">
           </div>
 
+          <div class="champ" id="bloc_validite_valeur">
+            <label for="validite_valeur">Durée de validité</label>
+            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="1">
+          </div>
+
+          <div class="champ" id="bloc_validite_unite">
+            <label for="validite_unite">Unité de validité</label>
+            <select id="validite_unite" name="validite_unite">
+              <option value="jours">jours</option>
+              <option value="semaines">semaines</option>
+              <option value="mois" selected>mois</option>
+              <option value="annees">années</option>
+            </select>
+          </div>
+
+          <div class="champ" id="bloc_grace_valeur">
+            <label for="grace_valeur">Durée de grâce</label>
+            <input type="number" min="0" step="1" id="grace_valeur" name="grace_valeur" value="0">
+          </div>
+
+          <div class="champ" id="bloc_grace_unite">
+            <label for="grace_unite">Unité de grâce</label>
+            <select id="grace_unite" name="grace_unite">
+              <option value="jours" selected>jours</option>
+              <option value="semaines">semaines</option>
+              <option value="mois">mois</option>
+              <option value="annees">années</option>
+            </select>
+          </div>
+
           <div class="champ" id="bloc_date_expiration">
-            <label for="date_expiration">Date d’expiration</label>
+            <label for="date_expiration">Date d’expiration (manuel / avancé)</label>
             <input type="datetime-local" id="date_expiration" name="date_expiration">
           </div>
 
           <div class="champ" id="bloc_grace_jusqu_a">
-            <label for="grace_jusqu_a">Fin de grâce</label>
+            <label for="grace_jusqu_a">Fin de grâce (manuel / avancé)</label>
             <input type="datetime-local" id="grace_jusqu_a" name="grace_jusqu_a">
           </div>
 
@@ -285,24 +315,50 @@ final class ControleurAccueil
       <script>
       (function () {
         var selectType = document.getElementById('type_licence');
-        var blocExpiration = document.getElementById('bloc_date_expiration');
-        var blocGrace = document.getElementById('bloc_grace_jusqu_a');
-        var champExpiration = document.getElementById('date_expiration');
-        var champGrace = document.getElementById('grace_jusqu_a');
+        var idsBlocs = [
+          'bloc_validite_valeur',
+          'bloc_validite_unite',
+          'bloc_grace_valeur',
+          'bloc_grace_unite',
+          'bloc_date_expiration',
+          'bloc_grace_jusqu_a'
+        ];
+        var champs = [
+          document.getElementById('validite_valeur'),
+          document.getElementById('validite_unite'),
+          document.getElementById('grace_valeur'),
+          document.getElementById('grace_unite'),
+          document.getElementById('date_expiration'),
+          document.getElementById('grace_jusqu_a')
+        ];
 
-        if (!selectType || !blocExpiration || !blocGrace || !champExpiration || !champGrace) {
+        if (!selectType) {
           return;
         }
 
         function mettreAJourVisibiliteDates() {
           var estAbonnement = selectType.value === 'abonnement';
 
-          blocExpiration.style.display = estAbonnement ? '' : 'none';
-          blocGrace.style.display = estAbonnement ? '' : 'none';
+          idsBlocs.forEach(function (idBloc) {
+            var bloc = document.getElementById(idBloc);
+            if (bloc) {
+              bloc.style.display = estAbonnement ? '' : 'none';
+            }
+          });
 
           if (!estAbonnement) {
-            champExpiration.value = '';
-            champGrace.value = '';
+            champs.forEach(function (champ) {
+              if (!champ) {
+                return;
+              }
+              if (champ.tagName === 'SELECT') {
+                champ.selectedIndex = 0;
+              } else if (champ.id === 'grace_valeur') {
+                champ.value = '0';
+              } else {
+                champ.value = '';
+              }
+            });
           }
         }
 
@@ -622,6 +678,12 @@ final class ControleurAccueil
         return;
       }
 
+      if (selectAction.value === 'reactiver') {
+        event.preventDefault();
+        window.location.href = '/licences/reactiver?ids=' + encodeURIComponent(selection.join(','));
+        return;
+      }
+
       var libelleAction = selectAction.options[selectAction.selectedIndex].text || selectAction.value;
       if (!window.confirm('Confirmer l’action « ' + libelleAction + ' » sur ' + selection.length + ' licence(s) ?')) {
         event.preventDefault();
@@ -648,6 +710,206 @@ final class ControleurAccueil
         exit;
     }
 
+
+    public function gererReactivationLicences(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $csrfSession = (string)($_SESSION['sr_licences_csrf'] ?? '');
+            $csrfFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+            if ($csrfSession === '' || !hash_equals($csrfSession, $csrfFormulaire)) {
+                $_SESSION['sr_licences_message_erreur'] = 'Jeton de sécurité invalide.';
+                header('Location: /');
+                exit;
+            }
+
+            $idsBruts = $_POST['ids_licence'] ?? [];
+            if (!is_array($idsBruts)) {
+                $idsBruts = [$idsBruts];
+            }
+
+            $idsLicence = array_values(array_unique(array_filter(array_map('intval', $idsBruts), static fn(int $id): bool => $id > 0)));
+
+            try {
+                $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+                $service = new ServiceLicence(new LicenceRepository($pdo));
+                $resultats = $service->reactiverLicencesAvecPeriode($idsLicence, [
+                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
+                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
+                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
+                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
+                ]);
+
+                $_SESSION['sr_licences_message_succes'] =
+                    count($resultats) . ' licence(s) réactivée(s) avec période de validité.';
+                header('Location: /');
+                exit;
+            } catch (Throwable $e) {
+                $_SESSION['sr_licences_message_erreur'] = 'Réactivation impossible : ' . $e->getMessage();
+                header('Location: /licences/reactiver?ids=' . implode(',', $idsLicence));
+                exit;
+            }
+        }
+
+        $idsTexte = trim((string)($_GET['ids'] ?? ''));
+        $idsLicence = [];
+        if ($idsTexte !== '') {
+            foreach (preg_split('/[,\s;]+/', $idsTexte) ?: [] as $element) {
+                $id = (int)$element;
+                if ($id > 0) {
+                    $idsLicence[] = $id;
+                }
+            }
+        }
+
+        $idsLicence = array_values(array_unique($idsLicence));
+
+        if (empty($idsLicence)) {
+            $_SESSION['sr_licences_message_erreur'] = 'Aucune licence sélectionnée pour la réactivation.';
+            header('Location: /');
+            exit;
+        }
+
+        if (empty($_SESSION['sr_licences_csrf'])) {
+            $_SESSION['sr_licences_csrf'] = bin2hex(random_bytes(16));
+        }
+
+        $messageErreur = (string)($_SESSION['sr_licences_message_erreur'] ?? '');
+        unset($_SESSION['sr_licences_message_erreur']);
+
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceLicence(new LicenceRepository($pdo));
+            $licences = [];
+            foreach ($idsLicence as $idLicence) {
+                $licences[] = $service->obtenirLicencePourAdmin($idLicence);
+            }
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Chargement impossible : ' . $e->getMessage();
+            header('Location: /');
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Réactiver des licences - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f8fafc;color:#111827}
+    .page{max-width:1100px;margin:32px auto;background:#fff;border:1px solid #dbe3ea;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+    .barre{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .muted{color:#4b5563}
+    .alerte-ko{margin:16px 0;padding:12px 14px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .formulaire{margin-top:22px;padding:18px;border:1px solid #dbe3ea;border-radius:14px;background:#fff}
+    .grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .champ label{display:block;margin:0 0 6px 0;font-weight:700}
+    .champ input,.champ select{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
+    .bloc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .bouton-principal,.bouton-secondaire{display:inline-block;padding:11px 14px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer}
+    .bouton-principal{border:0;background:#111827;color:#fff}
+    .bouton-secondaire{border:1px solid #cbd5e1;background:#fff;color:#111827}
+    table{width:100%;border-collapse:collapse;font-size:14px;margin-top:16px}
+    th,td{padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top}
+    th{background:#f8fafc}
+    code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="barre">
+      <div>
+        <h1 style="margin:0 0 8px 0;">Réactiver des licences</h1>
+        <p class="muted" style="margin:0;">La durée est obligatoire pour les licences abonnement. Les licences perpétuelles seront simplement remises à l’état actif.</p>
+      </div>
+      <div>
+        <a class="bouton-secondaire" href="/">Retour à la liste</a>
+      </div>
+    </div>
+
+    <?php if ($messageErreur !== ''): ?>
+      <div class="alerte-ko"><?php echo htmlspecialchars($messageErreur, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Clé</th>
+          <th>Type</th>
+          <th>Statut</th>
+          <th>Expiration actuelle</th>
+          <th>Grâce actuelle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($licences as $licence): ?>
+          <tr>
+            <td><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
+            <td><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+            <td><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars((string)($licence['statut'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+
+    <div class="formulaire">
+      <form method="post" action="/licences/reactiver">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <?php foreach ($idsLicence as $idLicence): ?>
+          <input type="hidden" name="ids_licence[]" value="<?php echo (int)$idLicence; ?>">
+        <?php endforeach; ?>
+
+        <div class="grille-form">
+          <div class="champ">
+            <label for="validite_valeur">Durée de validité</label>
+            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="1">
+          </div>
+
+          <div class="champ">
+            <label for="validite_unite">Unité de validité</label>
+            <select id="validite_unite" name="validite_unite">
+              <option value="jours">jours</option>
+              <option value="semaines">semaines</option>
+              <option value="mois" selected>mois</option>
+              <option value="annees">années</option>
+            </select>
+          </div>
+
+          <div class="champ">
+            <label for="grace_valeur">Durée de grâce</label>
+            <input type="number" min="0" step="1" id="grace_valeur" name="grace_valeur" value="0">
+          </div>
+
+          <div class="champ">
+            <label for="grace_unite">Unité de grâce</label>
+            <select id="grace_unite" name="grace_unite">
+              <option value="jours" selected>jours</option>
+              <option value="semaines">semaines</option>
+              <option value="mois">mois</option>
+              <option value="annees">années</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="bloc-actions">
+          <button type="submit" class="bouton-principal">Réactiver les licences sélectionnées</button>
+          <a class="bouton-secondaire" href="/">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+        <?php
+        exit;
+    }
 
     public function afficherLicence(): void
     {
@@ -832,6 +1094,10 @@ final class ControleurAccueil
                     'email_client' => (string)($_POST['email_client'] ?? ''),
                     'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
                     'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
+                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
+                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
+                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
                     'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
                     'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
                     'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
@@ -891,18 +1157,24 @@ final class ControleurAccueil
     .contenu{font-size:16px;line-height:1.45;word-break:break-word}
     .contenu code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
     .formulaire{margin-top:22px;padding:18px;border:1px solid #dbe3ea;border-radius:14px;background:#fff}
+    .section-formulaire{margin-top:18px;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fbfdff}
+    .section-formulaire:first-child{margin-top:0}
+    .section-formulaire h2{margin:0 0 14px 0;font-size:18px}
     .grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
     .champ label{display:block;margin:0 0 6px 0;font-weight:700}
     .champ input,.champ select,.champ textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
     .champ textarea{min-height:130px;resize:vertical}
     .bloc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
-    .bouton-principal,.bouton-secondaire{display:inline-block;padding:11px 14px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer}
+    .bouton-principal,.bouton-secondaire,.bouton-toggle-avance{display:inline-block;padding:11px 14px;border-radius:10px;font-weight:700;text-decoration:none;cursor:pointer}
     .bouton-principal{border:0;background:#111827;color:#fff}
     .bouton-secondaire{border:1px solid #cbd5e1;background:#fff;color:#111827}
+    .bouton-toggle-avance{border:1px solid #cbd5e1;background:#f8fafc;color:#111827}
     .alerte-ok{margin:16px 0;padding:12px 14px;border-radius:12px;background:#ecfdf5;color:#166534;border:1px solid #86efac}
     .alerte-ko{margin:16px 0;padding:12px 14px;border-radius:12px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
     .muted{color:#4b5563}
     .champ-dates-abonnement{display:block}
+    .bloc-avance{display:none;margin-top:14px;padding-top:14px;border-top:1px dashed #cbd5e1}
+    .bloc-avance.ouvert{display:block}
   </style>
 </head>
 <body>
@@ -960,53 +1232,106 @@ final class ControleurAccueil
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
         <input type="hidden" name="id_licence" value="<?php echo (int)($licence['id_licence'] ?? 0); ?>">
 
-        <div class="grille-form">
-          <div class="champ">
-            <label for="type_licence">Type de licence</label>
-            <select id="type_licence" name="type_licence" required>
-              <option value="perpetuelle" <?php echo (($licence['type_licence'] ?? '') === 'perpetuelle') ? 'selected' : ''; ?>>perpetuelle</option>
-              <option value="abonnement" <?php echo (($licence['type_licence'] ?? '') === 'abonnement') ? 'selected' : ''; ?>>abonnement</option>
-            </select>
+        <div class="section-formulaire">
+          <h2>Informations générales</h2>
+          <div class="grille-form">
+            <div class="champ">
+              <label for="type_licence">Type de licence</label>
+              <select id="type_licence" name="type_licence" required>
+                <option value="perpetuelle" <?php echo (($licence['type_licence'] ?? '') === 'perpetuelle') ? 'selected' : ''; ?>>perpetuelle</option>
+                <option value="abonnement" <?php echo (($licence['type_licence'] ?? '') === 'abonnement') ? 'selected' : ''; ?>>abonnement</option>
+              </select>
+            </div>
+
+            <div class="champ">
+              <label for="nom_client">Nom client</label>
+              <input type="text" id="nom_client" name="nom_client" value="<?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <div class="champ">
+              <label for="email_client">E-mail client</label>
+              <input type="email" id="email_client" name="email_client" value="<?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <div class="champ">
+              <label for="domaine_principal">Domaine principal</label>
+              <input type="text" id="domaine_principal" name="domaine_principal" value="<?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <div class="champ">
+              <label for="version_max_autorisee">Version max autorisée</label>
+              <input type="text" id="version_max_autorisee" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+          </div>
+        </div>
+
+        <div class="section-formulaire" id="section_abonnement_modification">
+          <h2>Période d’abonnement</h2>
+          <p class="muted" style="margin:0 0 14px 0;">Renseigne une nouvelle durée pour recalculer automatiquement l’échéance et la grâce. Les champs avancés manuels restent disponibles au besoin.</p>
+
+          <div class="grille-form">
+            <div class="champ champ-dates-abonnement" id="bloc_validite_valeur_modification">
+              <label for="validite_valeur">Nouvelle durée de validité</label>
+              <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="Laisser vide pour conserver l’échéance actuelle">
+            </div>
+
+            <div class="champ champ-dates-abonnement" id="bloc_validite_unite_modification">
+              <label for="validite_unite">Unité de validité</label>
+              <select id="validite_unite" name="validite_unite">
+                <option value="jours">jours</option>
+                <option value="semaines">semaines</option>
+                <option value="mois" selected>mois</option>
+                <option value="annees">années</option>
+              </select>
+            </div>
+
+            <div class="champ champ-dates-abonnement" id="bloc_grace_valeur_modification">
+              <label for="grace_valeur">Nouvelle durée de grâce</label>
+              <input type="number" min="0" step="1" id="grace_valeur" name="grace_valeur" placeholder="Laisser vide pour conserver l’existant">
+            </div>
+
+            <div class="champ champ-dates-abonnement" id="bloc_grace_unite_modification">
+              <label for="grace_unite">Unité de grâce</label>
+              <select id="grace_unite" name="grace_unite">
+                <option value="jours" selected>jours</option>
+                <option value="semaines">semaines</option>
+                <option value="mois">mois</option>
+                <option value="annees">années</option>
+              </select>
+            </div>
           </div>
 
-          <div class="champ">
-            <label for="nom_client">Nom client</label>
-            <input type="text" id="nom_client" name="nom_client" value="<?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+          <div style="margin-top:14px;">
+            <button type="button" class="bouton-toggle-avance" id="bouton_toggle_avance_modification">Afficher les réglages avancés</button>
           </div>
 
-          <div class="champ">
-            <label for="email_client">E-mail client</label>
-            <input type="email" id="email_client" name="email_client" value="<?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
+          <div class="bloc-avance" id="bloc_avance_modification">
+            <div class="grille-form">
+              <div class="champ champ-dates-abonnement">
+                <label for="date_expiration">Date d’expiration (manuel / avancé)</label>
+                <input type="datetime-local" id="date_expiration" name="date_expiration" value="<?php echo htmlspecialchars(((string)($licence['date_expiration'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['date_expiration'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+              </div>
 
-          <div class="champ">
-            <label for="domaine_principal">Domaine principal</label>
-            <input type="text" id="domaine_principal" name="domaine_principal" value="<?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+              <div class="champ champ-dates-abonnement">
+                <label for="grace_jusqu_a">Fin de grâce (manuel / avancé)</label>
+                <input type="datetime-local" id="grace_jusqu_a" name="grace_jusqu_a" value="<?php echo htmlspecialchars(((string)($licence['grace_jusqu_a'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['grace_jusqu_a'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div class="champ">
-            <label for="version_max_autorisee">Version max autorisée</label>
-            <input type="text" id="version_max_autorisee" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
+        <div class="section-formulaire">
+          <h2>Domaines et commentaire</h2>
+          <div class="grille-form">
+            <div class="champ" style="grid-column:1/-1;">
+              <label for="domaines_test">Domaines de test</label>
+              <textarea id="domaines_test" name="domaines_test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+            </div>
 
-          <div class="champ champ-dates-abonnement">
-            <label for="date_expiration">Date d’expiration</label>
-            <input type="datetime-local" id="date_expiration" name="date_expiration" value="<?php echo htmlspecialchars(((string)($licence['date_expiration'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['date_expiration'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
-
-          <div class="champ champ-dates-abonnement">
-            <label for="grace_jusqu_a">Fin de grâce</label>
-            <input type="datetime-local" id="grace_jusqu_a" name="grace_jusqu_a" value="<?php echo htmlspecialchars(((string)($licence['grace_jusqu_a'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['grace_jusqu_a'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
-
-          <div class="champ" style="grid-column:1/-1;">
-            <label for="domaines_test">Domaines de test</label>
-            <textarea id="domaines_test" name="domaines_test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
-          </div>
-
-          <div class="champ" style="grid-column:1/-1;">
-            <label for="commentaire_interne">Commentaire interne</label>
-            <textarea id="commentaire_interne" name="commentaire_interne"><?php echo htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+            <div class="champ" style="grid-column:1/-1;">
+              <label for="commentaire_interne">Commentaire interne</label>
+              <textarea id="commentaire_interne" name="commentaire_interne"><?php echo htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
+            </div>
           </div>
         </div>
 
@@ -1016,34 +1341,61 @@ final class ControleurAccueil
         </div>
       </form>
     </div>
+    </div>
   </div>
 
   <script>
   (function () {
     var selectType = document.getElementById('type_licence');
-    var champExpiration = document.getElementById('date_expiration');
-    var champGrace = document.getElementById('grace_jusqu_a');
+    var champs = [
+      document.getElementById('validite_valeur'),
+      document.getElementById('validite_unite'),
+      document.getElementById('grace_valeur'),
+      document.getElementById('grace_unite'),
+      document.getElementById('date_expiration'),
+      document.getElementById('grace_jusqu_a')
+    ];
+    var sectionAbonnement = document.getElementById('section_abonnement_modification');
+    var boutonAvance = document.getElementById('bouton_toggle_avance_modification');
+    var blocAvance = document.getElementById('bloc_avance_modification');
 
-    if (!selectType || !champExpiration || !champGrace) {
+    if (!selectType) {
       return;
     }
 
     function mettreAJourVisibiliteDates() {
       var abonnement = selectType.value === 'abonnement';
-      var blocExpiration = champExpiration.closest('.champ');
-      var blocGrace = champGrace.closest('.champ');
 
-      if (blocExpiration) {
-        blocExpiration.style.display = abonnement ? '' : 'none';
-      }
-      if (blocGrace) {
-        blocGrace.style.display = abonnement ? '' : 'none';
+      if (sectionAbonnement) {
+        sectionAbonnement.style.display = abonnement ? '' : 'none';
       }
 
       if (!abonnement) {
-        champExpiration.value = '';
-        champGrace.value = '';
+        champs.forEach(function (champ) {
+          if (!champ) {
+            return;
+          }
+          if (champ.tagName === 'SELECT') {
+            champ.selectedIndex = 0;
+          } else {
+            champ.value = '';
+          }
+        });
+
+        if (blocAvance) {
+          blocAvance.classList.remove('ouvert');
+        }
+        if (boutonAvance) {
+          boutonAvance.textContent = 'Afficher les réglages avancés';
+        }
       }
+    }
+
+    if (boutonAvance && blocAvance) {
+      boutonAvance.addEventListener('click', function () {
+        var ouvert = blocAvance.classList.toggle('ouvert');
+        boutonAvance.textContent = ouvert ? 'Masquer les réglages avancés' : 'Afficher les réglages avancés';
+      });
     }
 
     selectType.addEventListener('change', mettreAJourVisibiliteDates);
@@ -1086,6 +1438,10 @@ final class ControleurAccueil
                 'email_client' => (string)($_POST['email_client'] ?? ''),
                 'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
                 'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
+                'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
+                'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
+                'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
                 'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
                 'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
                 'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
@@ -1142,7 +1498,11 @@ final class ControleurAccueil
                 throw new \InvalidArgumentException('Aucune licence sélectionnée.');
             }
 
-            if (!in_array($actionStatut, ['reactiver', 'suspendre', 'revoquer'], true)) {
+            if ($actionStatut === 'reactiver') {
+                throw new \InvalidArgumentException('Utilise la réactivation avec période pour les abonnements.');
+            }
+
+            if (!in_array($actionStatut, ['suspendre', 'revoquer'], true)) {
                 throw new \InvalidArgumentException('Action de statut invalide.');
             }
 

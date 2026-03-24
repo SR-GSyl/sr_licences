@@ -127,6 +127,10 @@ switch ($chemin) {
         (new ControleurAccueil($config))->gererModificationLicence();
         break;
 
+    case '/licences/reactiver':
+        (new ControleurAccueil($config))->gererReactivationLicences();
+        break;
+
     case '/licences/statut-lot':
         (new ControleurAccueil($config))->traiterChangementStatutLicencesLot();
         break;

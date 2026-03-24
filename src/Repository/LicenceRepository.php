@@ -242,6 +242,7 @@ final class LicenceRepository
                 cle_licence,
                 code_module,
                 statut,
+                type_licence,
                 nom_client,
                 email_client,
                 domaine_principal,

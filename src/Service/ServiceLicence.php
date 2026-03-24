@@ -80,8 +80,8 @@ final class ServiceLicence
         $versionMax = trim((string)($donnees['version_max_autorisee'] ?? ''));
         $commentaire = trim((string)($donnees['commentaire_interne'] ?? ''));
         $domainesTest = $this->extraireDomainesTest($donnees['domaines_test'] ?? '');
-        $dateExpiration = $this->normaliserDateHeureNullable($donnees['date_expiration'] ?? null);
-        $graceJusquA = $this->normaliserDateHeureNullable($donnees['grace_jusqu_a'] ?? null);
+        $dateExpiration = null;
+        $graceJusquA = null;
 
         if ($codeModule === '') {
             throw new InvalidArgumentException('Le code module est obligatoire.');
@@ -106,9 +106,8 @@ final class ServiceLicence
             ));
         }
 
-        if ($typeLicence === 'perpetuelle') {
-            $dateExpiration = null;
-            $graceJusquA = null;
+        if ($typeLicence === 'abonnement') {
+            [$dateExpiration, $graceJusquA] = $this->preparerDatesAbonnementDepuisFormulaire($donnees, null, true);
         }
 
         $cleLicence = $this->genererCleLicence($codeModule);
@@ -147,7 +146,8 @@ final class ServiceLicence
             throw new InvalidArgumentException('Identifiant de licence invalide.');
         }
 
-        if (!$this->licenceRepository->licenceExiste($idLicence)) {
+        $licenceCourante = $this->licenceRepository->trouverLicenceParId($idLicence);
+        if ($licenceCourante === null) {
             throw new InvalidArgumentException('Licence introuvable.');
         }
 
@@ -158,8 +158,8 @@ final class ServiceLicence
         $versionMax = trim((string)($donnees['version_max_autorisee'] ?? ''));
         $commentaire = trim((string)($donnees['commentaire_interne'] ?? ''));
         $domainesTest = $this->extraireDomainesTest($donnees['domaines_test'] ?? '');
-        $dateExpiration = $this->normaliserDateHeureNullable($donnees['date_expiration'] ?? null);
-        $graceJusquA = $this->normaliserDateHeureNullable($donnees['grace_jusqu_a'] ?? null);
+        $dateExpiration = null;
+        $graceJusquA = null;
 
         if (!in_array($typeLicence, ['perpetuelle', 'abonnement'], true)) {
             throw new InvalidArgumentException('Le type de licence fourni est invalide.');
@@ -176,9 +176,8 @@ final class ServiceLicence
             ));
         }
 
-        if ($typeLicence === 'perpetuelle') {
-            $dateExpiration = null;
-            $graceJusquA = null;
+        if ($typeLicence === 'abonnement') {
+            [$dateExpiration, $graceJusquA] = $this->preparerDatesAbonnementDepuisFormulaire($donnees, $licenceCourante, false);
         }
 
         $this->licenceRepository->mettreAJourLicence($idLicence, [
@@ -213,8 +212,13 @@ final class ServiceLicence
             throw new InvalidArgumentException('Action de statut invalide.');
         }
 
-        if (!$this->licenceRepository->licenceExiste($idLicence)) {
+        $licence = $this->licenceRepository->trouverLicenceParId($idLicence);
+        if ($licence === null) {
             throw new InvalidArgumentException('Licence introuvable.');
+        }
+
+        if ($actionStatut === 'reactiver' && (string)($licence['type_licence'] ?? '') === 'abonnement') {
+            throw new InvalidArgumentException('La réactivation d’une licence abonnement doit passer par une période de validité.');
         }
 
         $nouveauStatut = $correspondance[$actionStatut];
@@ -224,6 +228,63 @@ final class ServiceLicence
             'id_licence' => $idLicence,
             'statut' => $nouveauStatut,
         ];
+    }
+
+    public function reactiverLicencesAvecPeriode(array $idsLicence, array $donnees): array
+    {
+        $idsLicence = array_values(array_unique(array_map('intval', $idsLicence)));
+        $idsLicence = array_values(array_filter($idsLicence, static fn(int $id): bool => $id > 0));
+
+        if (empty($idsLicence)) {
+            throw new InvalidArgumentException('Aucune licence sélectionnée pour la réactivation.');
+        }
+
+        $resultats = [];
+
+        foreach ($idsLicence as $idLicence) {
+            $licence = $this->licenceRepository->trouverLicenceParId($idLicence);
+            if ($licence === null) {
+                throw new InvalidArgumentException('Licence introuvable : #' . $idLicence . '.');
+            }
+
+            $typeLicence = (string)($licence['type_licence'] ?? 'perpetuelle');
+
+            if ($typeLicence === 'abonnement') {
+                [$dateExpiration, $graceJusquA] = $this->preparerDatesAbonnementDepuisFormulaire($donnees, null, true);
+
+                $this->licenceRepository->mettreAJourLicence($idLicence, [
+                    'type_licence' => $typeLicence,
+                    'nom_client' => (string)($licence['nom_client'] ?? ''),
+                    'email_client' => (string)($licence['email_client'] ?? ''),
+                    'domaine_principal' => (string)($licence['domaine_principal'] ?? ''),
+                    'version_max_autorisee' => (string)($licence['version_max_autorisee'] ?? ''),
+                    'date_expiration' => $dateExpiration,
+                    'grace_jusqu_a' => $graceJusquA,
+                    'commentaire_interne' => (string)($licence['commentaire_interne'] ?? ''),
+                ]);
+            } else {
+                $this->licenceRepository->mettreAJourLicence($idLicence, [
+                    'type_licence' => $typeLicence,
+                    'nom_client' => (string)($licence['nom_client'] ?? ''),
+                    'email_client' => (string)($licence['email_client'] ?? ''),
+                    'domaine_principal' => (string)($licence['domaine_principal'] ?? ''),
+                    'version_max_autorisee' => (string)($licence['version_max_autorisee'] ?? ''),
+                    'date_expiration' => null,
+                    'grace_jusqu_a' => null,
+                    'commentaire_interne' => (string)($licence['commentaire_interne'] ?? ''),
+                ]);
+            }
+
+            $this->licenceRepository->mettreAJourStatutLicence($idLicence, 'active');
+
+            $resultats[] = [
+                'id_licence' => $idLicence,
+                'type_licence' => $typeLicence,
+                'statut' => 'active',
+            ];
+        }
+
+        return $resultats;
     }
 
     public function verifierLicencePourApi(array $donnees): array
@@ -240,9 +301,9 @@ final class ServiceLicence
             throw new InvalidArgumentException('Le paramètre licence_key est obligatoire.');
         }
 
-        $maintenant = gmdate('c');
-        $prochaineVerification = gmdate('c', time() + 7 * 24 * 3600);
-        $graceJusquA = gmdate('c', time() + 14 * 24 * 3600);
+        $maintenantDt = new \DateTimeImmutable('now');
+        $maintenant = $maintenantDt->format(DATE_ATOM);
+        $prochaineVerification = $maintenantDt->modify('+1 day')->format(DATE_ATOM);
 
         $licence = $this->licenceRepository->trouverLicenceParCleEtModule($cleLicence, $module);
 
@@ -258,7 +319,7 @@ final class ServiceLicence
                 'domain_match' => false,
                 'checked_at' => $maintenant,
                 'next_check_at' => $prochaineVerification,
-                'grace_until' => $graceJusquA,
+                'grace_until' => '',
                 'max_version' => '',
                 'message' => 'Licence introuvable.',
                 'signature_method' => 'none',
@@ -268,7 +329,9 @@ final class ServiceLicence
 
         $idLicence = (int)($licence['id_licence'] ?? 0);
         $statutCentral = trim((string)($licence['statut'] ?? 'invalide'));
+        $typeLicence = trim((string)($licence['type_licence'] ?? 'perpetuelle'));
         $domainePrincipal = $this->normaliserDomaine((string)($licence['domaine_principal'] ?? ''));
+
         $domainesTest = array_map(
             fn(string $domaine): string => $this->normaliserDomaine($domaine),
             $this->licenceRepository->obtenirDomainesTestActifs($idLicence)
@@ -285,10 +348,33 @@ final class ServiceLicence
                 || in_array($domaineDemande, $domainesTest, true);
         }
 
+        $dateExpirationTexte = trim((string)($licence['date_expiration'] ?? ''));
+        $graceJusquATexte = trim((string)($licence['grace_jusqu_a'] ?? ''));
+
+        $dateExpiration = null;
+        if ($dateExpirationTexte !== '') {
+            try {
+                $dateExpiration = new \DateTimeImmutable($dateExpirationTexte);
+            } catch (\Throwable $e) {
+                $dateExpiration = null;
+            }
+        }
+
+        $graceJusquA = null;
+        if ($graceJusquATexte !== '') {
+            try {
+                $graceJusquA = new \DateTimeImmutable($graceJusquATexte);
+            } catch (\Throwable $e) {
+                $graceJusquA = null;
+            }
+        }
+
+        $graceUntilRetour = $graceJusquA instanceof \DateTimeImmutable ? $graceJusquA->format(DATE_ATOM) : '';
         $statutRetour = $statutCentral;
         $message = 'Licence ' . $statutCentral . '.';
 
         if (in_array($statutCentral, ['suspendue', 'revoquee', 'expiree', 'invalide'], true)) {
+            $statutRetour = $statutCentral;
             $message = 'Licence ' . $statutCentral . '.';
         } elseif (!$domaineAutorise) {
             $statutRetour = 'invalide';
@@ -296,6 +382,17 @@ final class ServiceLicence
                 $message = 'Domaine absent dans la requête.';
             } else {
                 $message = 'Domaine non autorisé pour cette licence.';
+            }
+        } elseif ($typeLicence === 'abonnement' && $dateExpiration instanceof \DateTimeImmutable) {
+            if ($maintenantDt <= $dateExpiration) {
+                $statutRetour = 'active';
+                $message = 'Licence active.';
+            } elseif ($graceJusquA instanceof \DateTimeImmutable && $maintenantDt <= $graceJusquA) {
+                $statutRetour = 'grace';
+                $message = 'Licence en grace.';
+            } else {
+                $statutRetour = 'expiree';
+                $message = 'Licence expiree.';
             }
         } else {
             $statutRetour = 'active';
@@ -313,12 +410,120 @@ final class ServiceLicence
             'domain_match' => $domaineAutorise,
             'checked_at' => $maintenant,
             'next_check_at' => $prochaineVerification,
-            'grace_until' => $graceJusquA,
+            'grace_until' => $graceUntilRetour,
             'max_version' => (string)($licence['version_max_autorisee'] ?? ''),
             'message' => $message,
             'signature_method' => 'none',
             'signature' => '',
         ];
+    }
+
+    private function preparerDatesAbonnementDepuisFormulaire(array $donnees, ?array $licenceExistante = null, bool $creation = false): array
+    {
+        $validiteValeur = $this->normaliserValeurPeriodeNullable($donnees['validite_valeur'] ?? null);
+        $validiteUnite = $this->normaliserUnitePeriode((string)($donnees['validite_unite'] ?? 'mois'));
+        $graceValeur = $this->normaliserValeurPeriodeNullable($donnees['grace_valeur'] ?? null, true);
+        $graceUnite = $this->normaliserUnitePeriode((string)($donnees['grace_unite'] ?? 'jours'));
+
+        $dateExpirationManuelle = $this->normaliserDateHeureNullable($donnees['date_expiration'] ?? null);
+        $graceManuelle = $this->normaliserDateHeureNullable($donnees['grace_jusqu_a'] ?? null);
+
+        if ($validiteValeur !== null) {
+            return $this->calculerDatesDepuisPeriodes($validiteValeur, $validiteUnite, $graceValeur, $graceUnite);
+        }
+
+        if ($dateExpirationManuelle !== null || $graceManuelle !== null) {
+            if ($dateExpirationManuelle === null) {
+                throw new InvalidArgumentException('La date d’expiration manuelle est obligatoire si une date de grâce manuelle est fournie.');
+            }
+
+            return [$dateExpirationManuelle, $graceManuelle];
+        }
+
+        if ($licenceExistante !== null) {
+            $dateExpirationExistante = $this->normaliserDateHeureNullable($licenceExistante['date_expiration'] ?? null);
+            $graceExistante = $this->normaliserDateHeureNullable($licenceExistante['grace_jusqu_a'] ?? null);
+
+            if ($dateExpirationExistante === null) {
+                throw new InvalidArgumentException('Une durée de validité ou une date d’expiration est obligatoire pour une licence abonnement.');
+            }
+
+            return [$dateExpirationExistante, $graceExistante];
+        }
+
+        if ($creation) {
+            throw new InvalidArgumentException('Une durée de validité ou une date d’expiration est obligatoire pour une licence abonnement.');
+        }
+
+        throw new InvalidArgumentException('Paramètres d’abonnement insuffisants.');
+    }
+
+    private function calculerDatesDepuisPeriodes(int $validiteValeur, string $validiteUnite, ?int $graceValeur, string $graceUnite): array
+    {
+        $base = new \DateTimeImmutable('now');
+        $dateExpiration = $this->ajouterPeriode($base, $validiteValeur, $validiteUnite);
+        $graceJusquA = null;
+
+        if ($graceValeur !== null && $graceValeur > 0) {
+            $graceJusquA = $this->ajouterPeriode($dateExpiration, $graceValeur, $graceUnite);
+        }
+
+        return [
+            $dateExpiration->format('Y-m-d H:i:s'),
+            $graceJusquA?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function ajouterPeriode(\DateTimeImmutable $base, int $valeur, string $unite): \DateTimeImmutable
+    {
+        $mapping = [
+            'jours' => 'days',
+            'semaines' => 'weeks',
+            'mois' => 'months',
+            'annees' => 'years',
+        ];
+
+        if (!isset($mapping[$unite])) {
+            throw new InvalidArgumentException('Unité de période invalide.');
+        }
+
+        return $base->modify('+' . $valeur . ' ' . $mapping[$unite]);
+    }
+
+    private function normaliserValeurPeriodeNullable(mixed $valeur, bool $autoriserZero = false): ?int
+    {
+        $texte = trim((string)$valeur);
+        if ($texte === '') {
+            return null;
+        }
+
+        if (!preg_match('/^\d+$/', $texte)) {
+            throw new InvalidArgumentException('La valeur de période fournie est invalide.');
+        }
+
+        $entier = (int)$texte;
+
+        if ($autoriserZero) {
+            if ($entier < 0) {
+                throw new InvalidArgumentException('La valeur de période fournie est invalide.');
+            }
+        } else {
+            if ($entier <= 0) {
+                throw new InvalidArgumentException('La valeur de période fournie est invalide.');
+            }
+        }
+
+        return $entier;
+    }
+
+    private function normaliserUnitePeriode(string $unite): string
+    {
+        $unite = trim(mb_strtolower($unite));
+        if (!in_array($unite, ['jours', 'semaines', 'mois', 'annees'], true)) {
+            throw new InvalidArgumentException('L’unité de période fournie est invalide.');
+        }
+
+        return $unite;
     }
 
     private function extraireDomainesTest(mixed $valeur): array
