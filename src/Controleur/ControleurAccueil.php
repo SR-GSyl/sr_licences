@@ -131,6 +131,10 @@ final class ControleurAccueil
     .btn-secondaire{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#111827;font-weight:700;cursor:pointer}
     .resume-filtres{margin:0 0 10px 0;color:#4b5563;font-size:13px}
     .ligne-masquee{display:none}
+    .entete-accordeon{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+    .bouton-accordeon{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#111827;font-weight:700;cursor:pointer}
+    .contenu-accordeon{display:none;margin-top:14px}
+    .contenu-accordeon.ouvert{display:block}
   </style>
 </head>
 <body>
@@ -206,8 +210,12 @@ final class ControleurAccueil
     </div>
 
     <div class="formulaire">
-      <h2>Créer une licence</h2>
+      <div class="entete-accordeon">
+        <h2 style="margin:0;">Créer une licence</h2>
+        <button type="button" class="bouton-accordeon" id="bouton_accordeon_creation">Afficher la création d’une licence</button>
+      </div>
 
+      <div class="contenu-accordeon" id="contenu_accordeon_creation">
       <form method="post" action="/licences/creer">
         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
 
@@ -258,7 +266,7 @@ final class ControleurAccueil
 
           <div class="champ" id="bloc_validite_valeur">
             <label for="validite_valeur">Durée de validité</label>
-            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="1">
+            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" value="1" required>
           </div>
 
           <div class="champ" id="bloc_validite_unite">
@@ -331,6 +339,8 @@ final class ControleurAccueil
           document.getElementById('date_expiration'),
           document.getElementById('grace_jusqu_a')
         ];
+        var boutonAccordeon = document.getElementById('bouton_accordeon_creation');
+        var contenuAccordeon = document.getElementById('contenu_accordeon_creation');
 
         if (!selectType) {
           return;
@@ -362,10 +372,18 @@ final class ControleurAccueil
           }
         }
 
+        if (boutonAccordeon && contenuAccordeon) {
+          boutonAccordeon.addEventListener('click', function () {
+            var ouvert = contenuAccordeon.classList.toggle('ouvert');
+            boutonAccordeon.textContent = ouvert ? 'Masquer la création d’une licence' : 'Afficher la création d’une licence';
+          });
+        }
+
         selectType.addEventListener('change', mettreAJourVisibiliteDates);
         mettreAJourVisibiliteDates();
       })();
       </script>
+      </div>
     </div>
 
     <div class="bloc-liste">
@@ -733,11 +751,26 @@ final class ControleurAccueil
             try {
                 $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
                 $service = new ServiceLicence(new LicenceRepository($pdo));
+                $validiteValeur = trim((string)($_POST['validite_valeur'] ?? ''));
+                $validiteUnite = trim((string)($_POST['validite_unite'] ?? 'mois'));
+                $graceValeur = trim((string)($_POST['grace_valeur'] ?? ''));
+                $graceUnite = trim((string)($_POST['grace_unite'] ?? 'jours'));
+
+                if ($validiteValeur === '') {
+                    $validiteValeur = '1';
+                }
+                if ($validiteUnite === '') {
+                    $validiteUnite = 'mois';
+                }
+                if ($graceUnite === '') {
+                    $graceUnite = 'jours';
+                }
+
                 $resultats = $service->reactiverLicencesAvecPeriode($idsLicence, [
-                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
-                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
-                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
-                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
+                    'validite_valeur' => $validiteValeur,
+                    'validite_unite' => $validiteUnite,
+                    'grace_valeur' => $graceValeur,
+                    'grace_unite' => $graceUnite,
                 ]);
 
                 $_SESSION['sr_licences_message_succes'] =
@@ -869,7 +902,7 @@ final class ControleurAccueil
         <div class="grille-form">
           <div class="champ">
             <label for="validite_valeur">Durée de validité</label>
-            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="1">
+            <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" value="1" required>
           </div>
 
           <div class="champ">

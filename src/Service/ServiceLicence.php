@@ -290,6 +290,7 @@ final class ServiceLicence
     public function verifierLicencePourApi(array $donnees): array
     {
         $module = trim((string)($donnees['module'] ?? $donnees['code_module'] ?? ''));
+        $versionDemandee = trim((string)($donnees['version'] ?? ''));
         $cleLicence = trim((string)($donnees['licence_key'] ?? $donnees['cle_licence'] ?? ''));
         $domaineDemande = $this->normaliserDomaine((string)($donnees['domain'] ?? $donnees['domaine'] ?? ''));
 
@@ -331,6 +332,7 @@ final class ServiceLicence
         $statutCentral = trim((string)($licence['statut'] ?? 'invalide'));
         $typeLicence = trim((string)($licence['type_licence'] ?? 'perpetuelle'));
         $domainePrincipal = $this->normaliserDomaine((string)($licence['domaine_principal'] ?? ''));
+        $versionMaxAutorisee = trim((string)($licence['version_max_autorisee'] ?? ''));
 
         $domainesTest = array_map(
             fn(string $domaine): string => $this->normaliserDomaine($domaine),
@@ -383,6 +385,15 @@ final class ServiceLicence
             } else {
                 $message = 'Domaine non autorisé pour cette licence.';
             }
+        } elseif (!$this->versionModuleEstAutorisee($versionDemandee, $versionMaxAutorisee)) {
+            $statutRetour = 'invalide';
+            if ($versionMaxAutorisee === '') {
+                $message = 'Version du module non transmise.';
+            } elseif ($versionDemandee === '') {
+                $message = 'Version du module absente alors qu’une version max autorisée est définie.';
+            } else {
+                $message = 'Version du module non autorisée. Version demandée : ' . $versionDemandee . '. Version max autorisée : ' . $versionMaxAutorisee . '.';
+            }
         } elseif ($typeLicence === 'abonnement' && $dateExpiration instanceof \DateTimeImmutable) {
             if ($maintenantDt <= $dateExpiration) {
                 $statutRetour = 'active';
@@ -411,11 +422,65 @@ final class ServiceLicence
             'checked_at' => $maintenant,
             'next_check_at' => $prochaineVerification,
             'grace_until' => $graceUntilRetour,
-            'max_version' => (string)($licence['version_max_autorisee'] ?? ''),
+            'max_version' => $versionMaxAutorisee,
             'message' => $message,
             'signature_method' => 'none',
             'signature' => '',
         ];
+    }
+
+    private function versionModuleEstAutorisee(string $versionDemandee, string $versionMaxAutorisee): bool
+    {
+        $versionDemandee = $this->normaliserVersionLicence($versionDemandee);
+        $versionMaxAutorisee = trim($versionMaxAutorisee);
+
+        if ($versionMaxAutorisee === '') {
+            return true;
+        }
+
+        if ($versionDemandee === '') {
+            return false;
+        }
+
+        $motifs = preg_split('/[\r\n,;|]+/', $versionMaxAutorisee) ?: [];
+        foreach ($motifs as $motif) {
+            $motif = $this->normaliserVersionLicence($motif);
+            if ($motif === '') {
+                continue;
+            }
+
+            if ($this->versionCorrespondAuMotif($versionDemandee, $motif)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function versionCorrespondAuMotif(string $versionDemandee, string $motif): bool
+    {
+        if (strpos($motif, '*') === false) {
+            return $versionDemandee === $motif;
+        }
+
+        $regex = preg_quote($motif, '/');
+        $regex = str_replace('\*', '.*', $regex);
+
+        return (bool)preg_match('/^' . $regex . '$/i', $versionDemandee);
+    }
+
+    private function normaliserVersionLicence(string $version): string
+    {
+        $version = trim(mb_strtolower($version));
+        if ($version === '') {
+            return '';
+        }
+
+        if (str_starts_with($version, 'v')) {
+            $version = substr($version, 1);
+        }
+
+        return trim($version);
     }
 
     private function preparerDatesAbonnementDepuisFormulaire(array $donnees, ?array $licenceExistante = null, bool $creation = false): array
