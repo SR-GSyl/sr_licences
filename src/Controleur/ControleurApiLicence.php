@@ -40,6 +40,7 @@ final class ControleurApiLicence
 
             $donnees = Requete::donneesEntree();
             $resultat = $serviceLicence->verifierLicencePourApi($donnees);
+            $serviceLicence->enregistrerObservationVerification($donnees, $resultat);
             $resultat = $serviceSignature->signerReponse($resultat, $this->config);
 
             ReponseJson::envoyer($resultat, 200);

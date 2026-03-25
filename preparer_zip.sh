@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ./preparer_zip.sh
+# cp /home/sylvere/sr_licences.zip /mnt/c/Users/soulr/Downloads/
 set -euo pipefail
 
 DOSSIER_REPO="/home/sylvere/Git_depot_local/sr_licences"

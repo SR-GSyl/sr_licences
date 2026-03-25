@@ -591,6 +591,159 @@ final class ServiceLicence
         return $unite;
     }
 
+    public function enregistrerObservationVerification(array $donnees, array $resultat): void
+    {
+        $dossier = dirname(__DIR__, 2) . '/var/log';
+        if (!is_dir($dossier)) {
+            @mkdir($dossier, 0755, true);
+        }
+
+        $fichier = $dossier . '/licence_heartbeats.json';
+        $etat = [];
+
+        if (is_file($fichier)) {
+            $json = @file_get_contents($fichier);
+            if (is_string($json) && $json !== '') {
+                $decode = json_decode($json, true);
+                if (is_array($decode)) {
+                    $etat = $decode;
+                }
+            }
+        }
+
+        $module = trim((string)($donnees['module'] ?? $donnees['code_module'] ?? ''));
+        $licenceKey = trim((string)($donnees['licence_key'] ?? $donnees['cle_licence'] ?? ''));
+        $version = trim((string)($donnees['version'] ?? ''));
+        $requestDomain = $this->normaliserDomaine((string)($donnees['domain'] ?? $donnees['domaine'] ?? ''));
+        $index = sha1($module . '|' . $licenceKey . '|' . $requestDomain);
+
+        $etat[$index] = [
+            'index' => $index,
+            'module' => $module,
+            'licence_key' => $licenceKey,
+            'version' => $version,
+            'request_domain' => $requestDomain,
+            'status' => (string)($resultat['status'] ?? ''),
+            'checked_at' => (string)($resultat['checked_at'] ?? ''),
+            'next_check_at' => (string)($resultat['next_check_at'] ?? ''),
+            'grace_until' => (string)($resultat['grace_until'] ?? ''),
+            'max_version' => (string)($resultat['max_version'] ?? ''),
+            'last_seen_server' => date('c'),
+        ];
+
+        @file_put_contents(
+            $fichier,
+            json_encode($etat, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            LOCK_EX
+        );
+    }
+
+    public function obtenirAlertesSilenceVerification(int $margeMinutes = 120): array
+    {
+        $fichier = dirname(__DIR__, 2) . '/var/log/licence_heartbeats.json';
+        if (!is_file($fichier)) {
+            return [];
+        }
+
+        $json = @file_get_contents($fichier);
+        if (!is_string($json) || trim($json) === '') {
+            return [];
+        }
+
+        $etat = json_decode($json, true);
+        if (!is_array($etat)) {
+            return [];
+        }
+
+        $maintenant = time();
+        $alertes = [];
+
+        foreach ($etat as $entree) {
+            if (!is_array($entree)) {
+                continue;
+            }
+
+            $nextCheckAt = trim((string)($entree['next_check_at'] ?? ''));
+            $timestampNext = $nextCheckAt !== '' ? strtotime($nextCheckAt) : false;
+            if ($timestampNext === false) {
+                continue;
+            }
+
+            $retardSecondes = $maintenant - ($timestampNext + ($margeMinutes * 60));
+            if ($retardSecondes <= 0) {
+                continue;
+            }
+
+            $entree['retard_minutes'] = (int)floor($retardSecondes / 60);
+            $alertes[] = $entree;
+        }
+
+        usort($alertes, static function (array $a, array $b): int {
+            return (int)($b['retard_minutes'] ?? 0) <=> (int)($a['retard_minutes'] ?? 0);
+        });
+
+        return $alertes;
+    }
+
+    public function journaliserAlertesSilenceVerification(array $alertes): void
+    {
+        $dossier = dirname(__DIR__, 2) . '/var/log';
+        if (!is_dir($dossier)) {
+            @mkdir($dossier, 0755, true);
+        }
+
+        $fichier = $dossier . '/licence_surveillance.log';
+        $memoFile = $dossier . '/licence_silences_signales.json';
+        $memo = [];
+
+        if (is_file($memoFile)) {
+            $json = @file_get_contents($memoFile);
+            if (is_string($json) && $json !== '') {
+                $decode = json_decode($json, true);
+                if (is_array($decode)) {
+                    $memo = $decode;
+                }
+            }
+        }
+
+        $actifs = [];
+
+        foreach ($alertes as $alerte) {
+            if (!is_array($alerte)) {
+                continue;
+            }
+
+            $index = (string)($alerte['index'] ?? '');
+            if ($index === '') {
+                continue;
+            }
+
+            $signature = (string)($alerte['next_check_at'] ?? '') . '|' . (string)($alerte['status'] ?? '');
+            $actifs[$index] = $signature;
+
+            if (($memo[$index] ?? '') === $signature) {
+                continue;
+            }
+
+            $ligne = sprintf(
+                "[%s] [WARN] Vérification silencieuse détectée pour %s / %s / %s (retard : %d min)
+",
+                date('Y-m-d H:i:s'),
+                (string)($alerte['module'] ?? ''),
+                (string)($alerte['licence_key'] ?? ''),
+                (string)($alerte['request_domain'] ?? ''),
+                (int)($alerte['retard_minutes'] ?? 0)
+            );
+            @file_put_contents($fichier, $ligne, FILE_APPEND);
+        }
+
+        @file_put_contents(
+            $memoFile,
+            json_encode($actifs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            LOCK_EX
+        );
+    }
+
     private function extraireDomainesTest(mixed $valeur): array
     {
         $texte = trim((string)$valeur);

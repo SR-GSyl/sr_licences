@@ -37,6 +37,7 @@ final class ControleurAccueil
         ];
 
         $licences = [];
+        $alertesSilence = [];
         $messageStatistiques = 'Compteurs non disponibles tant que la BDD n’est pas configurée.';
         $messageListe = 'Liste non disponible tant que la BDD n’est pas configurée.';
 
@@ -46,6 +47,8 @@ final class ControleurAccueil
                 $service = new ServiceLicence(new LicenceRepository($pdo));
                 $statistiques = $service->obtenirStatistiquesTableauDeBord();
                 $licences = $service->obtenirLicencesTableauDeBord(100);
+                $alertesSilence = $service->obtenirAlertesSilenceVerification();
+                $service->journaliserAlertesSilenceVerification($alertesSilence);
                 $messageStatistiques = 'Lecture des statistiques OK.';
                 $messageListe = 'Lecture de la liste OK.';
             } catch (Throwable $e) {
@@ -155,6 +158,23 @@ final class ControleurAccueil
 
     <?php if ($messageErreur !== ''): ?>
       <div class="alerte-ko"><?php echo htmlspecialchars($messageErreur, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($alertesSilence)): ?>
+      <div class="alerte-ko">
+        <strong><?php echo (int)count($alertesSilence); ?> licence(s) sans vérification récente détectée(s).</strong>
+        <div class="muted" style="margin-top:8px;">Une vérification est considérée en retard si le délai prévu est dépassé depuis plus de 120 minutes.</div>
+        <ul style="margin:10px 0 0 18px;padding:0;">
+          <?php foreach (array_slice($alertesSilence, 0, 5) as $alerte): ?>
+            <li>
+              <code><?php echo htmlspecialchars((string)($alerte['module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
+              — <code><?php echo htmlspecialchars((string)($alerte['licence_key'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
+              — <?php echo htmlspecialchars((string)($alerte['request_domain'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
+              — retard : <strong><?php echo (int)($alerte['retard_minutes'] ?? 0); ?> min</strong>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
     <?php endif; ?>
 
     <div class="grille">
