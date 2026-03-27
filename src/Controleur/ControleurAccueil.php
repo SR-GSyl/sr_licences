@@ -4,7 +4,9 @@ declare(strict_types=1);
 namespace SrLicences\Controleur;
 
 use SrLicences\Config\BaseDeDonnees;
+use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\LicenceRepository;
+use SrLicences\Service\ServiceDemandeActivation;
 use SrLicences\Service\ServiceLicence;
 use Throwable;
 
@@ -38,8 +40,17 @@ final class ControleurAccueil
 
         $licences = [];
         $alertesSilence = [];
+        $statistiquesDemandesActivation = [
+            'total' => 0,
+            'en_attente' => 0,
+            'validee' => 0,
+            'refusee' => 0,
+            'terminee' => 0,
+        ];
+        $demandesActivation = [];
         $messageStatistiques = 'Compteurs non disponibles tant que la BDD n’est pas configurée.';
         $messageListe = 'Liste non disponible tant que la BDD n’est pas configurée.';
+        $messageDemandesActivation = 'Demandes d’activation non disponibles tant que la BDD n’est pas configurée.';
 
         if (!empty($etatBdd['ok'])) {
             try {
@@ -51,9 +62,22 @@ final class ControleurAccueil
                 $service->journaliserAlertesSilenceVerification($alertesSilence);
                 $messageStatistiques = 'Lecture des statistiques OK.';
                 $messageListe = 'Lecture de la liste OK.';
+
+                try {
+                    $serviceDemandesActivation = new ServiceDemandeActivation(
+                        new DemandeActivationRepository($pdo),
+                        new LicenceRepository($pdo)
+                    );
+                    $statistiquesDemandesActivation = $serviceDemandesActivation->obtenirStatistiquesTableauDeBord();
+                    $demandesActivation = $serviceDemandesActivation->obtenirDemandesTableauDeBord(100);
+                    $messageDemandesActivation = 'Lecture des demandes d’activation OK.';
+                } catch (Throwable $e) {
+                    $messageDemandesActivation = $e->getMessage();
+                }
             } catch (Throwable $e) {
                 $messageStatistiques = $e->getMessage();
                 $messageListe = $e->getMessage();
+                $messageDemandesActivation = $e->getMessage();
             }
         }
 
@@ -404,6 +428,165 @@ final class ControleurAccueil
       })();
       </script>
       </div>
+    </div>
+
+    <div class="bloc-liste">
+      <h2>Demandes d’activation</h2>
+      <p class="muted"><?php echo htmlspecialchars($messageDemandesActivation, ENT_QUOTES, 'UTF-8'); ?></p>
+
+      <div class="grille">
+        <div class="carte">
+          <h3 class="titre">Total demandes</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['total'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">En attente</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['en_attente'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Validées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['validee'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Refusées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['refusee'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Terminées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['terminee'] ?? 0); ?></div>
+        </div>
+      </div>
+
+      <?php if (empty($demandesActivation)): ?>
+        <p class="muted">Aucune demande d’activation enregistrée pour le moment.</p>
+      <?php else: ?>
+        <div class="grille" style="margin-top:16px;">
+          <?php foreach ($demandesActivation as $demande): ?>
+            <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
+            <div class="carte">
+              <div class="barre" style="margin-bottom:10px;">
+                <h3 class="titre" style="margin:0;">Demande #<?php echo (int)($demande['id_demande_activation'] ?? 0); ?></h3>
+                <span class="badge <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($statutDemande, ENT_QUOTES, 'UTF-8'); ?></span>
+              </div>
+
+              <p class="muted" style="margin-top:0;">
+                Module : <code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
+                — Version : <code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
+              </p>
+
+              <div class="grille-form">
+                <div class="champ">
+                  <label>Client</label>
+                  <div><?php echo htmlspecialchars((string)($demande['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                </div>
+                <div class="champ">
+                  <label>E-mail</label>
+                  <div><?php echo htmlspecialchars((string)($demande['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                </div>
+                <div class="champ">
+                  <label>N° de commande</label>
+                  <div><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+                </div>
+                <div class="champ">
+                  <label>Domaine principal</label>
+                  <div><code><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
+                </div>
+                <div class="champ" style="grid-column:1/-1;">
+                  <label>Domaines de test</label>
+                  <div><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div>
+                </div>
+                <div class="champ">
+                  <label>Créée le</label>
+                  <div><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+                </div>
+                <div class="champ">
+                  <label>Licence liée</label>
+                  <div><?php echo (int)($demande['id_licence'] ?? 0) > 0 ? '#' . (int)$demande['id_licence'] : '—'; ?></div>
+                </div>
+                <div class="champ" style="grid-column:1/-1;">
+                  <label>Note interne</label>
+                  <div><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div>
+                </div>
+              </div>
+
+              <?php if (in_array($statutDemande, ['en_attente', 'refusee'], true)): ?>
+                <form method="post" action="/demandes-activation/decision" class="formulaire" style="margin-top:14px;">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+                  <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
+                  <input type="hidden" name="action_decision" value="valider">
+
+                  <div class="grille-form">
+                    <div class="champ">
+                      <label>Type de licence</label>
+                      <select name="type_licence">
+                        <option value="perpetuelle">perpétuelle</option>
+                        <option value="abonnement">abonnement</option>
+                      </select>
+                    </div>
+                    <div class="champ">
+                      <label>Version max autorisée</label>
+                      <input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*">
+                    </div>
+                    <div class="champ">
+                      <label>Durée de validité</label>
+                      <input type="number" min="1" step="1" name="validite_valeur" value="12">
+                    </div>
+                    <div class="champ">
+                      <label>Unité de validité</label>
+                      <select name="validite_unite">
+                        <option value="jours">jours</option>
+                        <option value="semaines">semaines</option>
+                        <option value="mois" selected>mois</option>
+                        <option value="annees">années</option>
+                      </select>
+                    </div>
+                    <div class="champ">
+                      <label>Durée de grâce</label>
+                      <input type="number" min="0" step="1" name="grace_valeur" value="7">
+                    </div>
+                    <div class="champ">
+                      <label>Unité de grâce</label>
+                      <select name="grace_unite">
+                        <option value="jours" selected>jours</option>
+                        <option value="semaines">semaines</option>
+                        <option value="mois">mois</option>
+                        <option value="annees">années</option>
+                      </select>
+                    </div>
+                    <div class="champ" style="grid-column:1/-1;">
+                      <label>Note interne de validation</label>
+                      <textarea name="note_interne" placeholder="Note interne facultative"></textarea>
+                    </div>
+                  </div>
+
+                  <div class="actions-form">
+                    <button type="submit">Valider la demande et créer la licence</button>
+                  </div>
+                </form>
+              <?php endif; ?>
+
+              <?php if (in_array($statutDemande, ['en_attente', 'validee'], true)): ?>
+                <form method="post" action="/demandes-activation/decision" class="formulaire" style="margin-top:14px;">
+                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+                  <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
+                  <input type="hidden" name="action_decision" value="refuser">
+
+                  <div class="grille-form">
+                    <div class="champ" style="grid-column:1/-1;">
+                      <label>Motif / note interne de refus</label>
+                      <textarea name="note_interne" placeholder="Motif facultatif"></textarea>
+                    </div>
+                  </div>
+
+                  <div class="actions-form">
+                    <button type="submit">Refuser la demande</button>
+                  </div>
+                </form>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
     </div>
 
     <div class="bloc-liste">
@@ -1511,6 +1694,69 @@ final class ControleurAccueil
         exit;
     }
 
+    public function traiterDecisionDemandeActivation(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo '405 - Méthode non autorisée';
+            exit;
+        }
+
+        $csrfSession = (string)($_SESSION['sr_licences_csrf'] ?? '');
+        $csrfFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfFormulaire)) {
+            $_SESSION['sr_licences_message_erreur'] = 'Jeton de sécurité invalide.';
+            header('Location: /');
+            exit;
+        }
+
+        try {
+            $idDemandeActivation = (int)($_POST['id_demande_activation'] ?? 0);
+            $actionDecision = trim((string)($_POST['action_decision'] ?? ''));
+
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceDemandeActivation(
+                new DemandeActivationRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+
+            if ($actionDecision === 'valider') {
+                $resultat = $service->validerDemandeActivation($idDemandeActivation, [
+                    'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
+                    'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
+                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
+                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
+                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
+                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
+                    'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
+                    'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
+                    'note_interne' => (string)($_POST['note_interne'] ?? ''),
+                ]);
+
+                $_SESSION['sr_licences_message_succes'] =
+                    'Demande #' . (int)($resultat['id_demande_activation'] ?? 0) .
+                    ' validée. Licence créée : ' . (string)($resultat['cle_licence'] ?? '');
+            } elseif ($actionDecision === 'refuser') {
+                $resultat = $service->refuserDemandeActivation(
+                    $idDemandeActivation,
+                    (string)($_POST['note_interne'] ?? '')
+                );
+
+                $_SESSION['sr_licences_message_succes'] =
+                    'Demande #' . (int)($resultat['id_demande_activation'] ?? 0) . ' refusée.';
+            } else {
+                throw new \InvalidArgumentException('Action de décision invalide.');
+            }
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Décision impossible : ' . $e->getMessage();
+        }
+
+        header('Location: /');
+        exit;
+    }
+
     public function traiterChangementStatutLicencesLot(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1621,6 +1867,17 @@ final class ControleurAccueil
             'revoquee' => 'statut-revoquee',
             'expiree' => 'statut-expiree',
             'invalide' => 'statut-invalide',
+            default => 'statut-invalide',
+        };
+    }
+
+    private function obtenirClasseStatutDemandeActivation(string $statut): string
+    {
+        return match ($statut) {
+            'en_attente' => 'statut-expiree',
+            'validee' => 'statut-active',
+            'refusee' => 'statut-revoquee',
+            'terminee' => 'statut-suspendue',
             default => 'statut-invalide',
         };
     }

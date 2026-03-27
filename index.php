@@ -40,6 +40,8 @@ if (isset($_GET['logout'])) {
 
 $routesPubliques = [
     '/api/licence/check',
+    '/api/licence/demander-activation',
+    '/api/licence/verifier-activation',
 ];
 
 $routeEstPublique = in_array($chemin, $routesPubliques, true);
@@ -135,6 +137,9 @@ switch ($chemin) {
         (new ControleurAccueil($config))->traiterChangementStatutLicencesLot();
         break;
 
+    case '/demandes-activation/decision':
+        (new ControleurAccueil($config))->traiterDecisionDemandeActivation();
+        break;
 
     case '/licences/statut':
         (new ControleurAccueil($config))->traiterChangementStatutLicence();
@@ -146,6 +151,14 @@ switch ($chemin) {
 
     case '/api/licence/check':
         (new ControleurApiLicence($config))->check();
+        break;
+
+    case '/api/licence/demander-activation':
+        (new ControleurApiLicence($config))->demanderActivation();
+        break;
+
+    case '/api/licence/verifier-activation':
+        (new ControleurApiLicence($config))->verifierActivation();
         break;
 
     default:
