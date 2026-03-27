@@ -125,14 +125,8 @@ final class ServiceDemandeActivation
             ];
         }
 
-        if ($statut === 'terminee') {
-            return [
-                'ok' => true,
-                'message' => 'Demande déjà consommée.',
-                'id_demande_activation' => $idDemandeActivation,
-                'statut' => 'terminee',
-                'checked_at' => date('c'),
-            ];
+        if (!in_array($statut, ['validee', 'terminee'], true)) {
+            throw new InvalidArgumentException('Le statut de la demande est invalide pour une récupération de clé.');
         }
 
         $idLicence = (int)($demande['id_licence'] ?? 0);
@@ -145,13 +139,12 @@ final class ServiceDemandeActivation
             throw new InvalidArgumentException('La licence liée à cette demande est introuvable.');
         }
 
-        $this->demandeActivationRepository->marquerDemandeTerminee($idDemandeActivation);
-
         return [
             'ok' => true,
             'message' => 'Activation disponible.',
             'id_demande_activation' => $idDemandeActivation,
             'statut' => 'validee',
+            'statut_demande' => $statut,
             'licence_key' => (string)($licence['cle_licence'] ?? ''),
             'cle_licence' => (string)($licence['cle_licence'] ?? ''),
             'module' => (string)($licence['code_module'] ?? ''),

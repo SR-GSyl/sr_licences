@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# ./propager_vers_dev.sh
 set -euo pipefail
 
 DOSSIER_SOURCE_DEV="/home/sylvere/Git_depot_local/sr_licences"
