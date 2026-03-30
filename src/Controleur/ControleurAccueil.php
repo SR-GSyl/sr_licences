@@ -70,6 +70,10 @@ final class ControleurAccueil
                     );
                     $statistiquesDemandesActivation = $serviceDemandesActivation->obtenirStatistiquesTableauDeBord();
                     $demandesActivation = $serviceDemandesActivation->obtenirDemandesTableauDeBord(100);
+                    $demandesActivation = array_values(array_filter(
+                        $demandesActivation,
+                        static fn(array $demande): bool => (string)($demande['statut'] ?? '') !== 'terminee'
+                    ));
                     $messageDemandesActivation = 'Lecture des demandes d’activation OK.';
                 } catch (Throwable $e) {
                     $messageDemandesActivation = $e->getMessage();
