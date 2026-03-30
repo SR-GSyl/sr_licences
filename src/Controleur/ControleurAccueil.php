@@ -70,10 +70,6 @@ final class ControleurAccueil
                     );
                     $statistiquesDemandesActivation = $serviceDemandesActivation->obtenirStatistiquesTableauDeBord();
                     $demandesActivation = $serviceDemandesActivation->obtenirDemandesTableauDeBord(100);
-                    $demandesActivation = array_values(array_filter(
-                        $demandesActivation,
-                        static fn(array $demande): bool => (string)($demande['statut'] ?? '') !== 'terminee'
-                    ));
                     $messageDemandesActivation = 'Lecture des demandes d’activation OK.';
                 } catch (Throwable $e) {
                     $messageDemandesActivation = $e->getMessage();
@@ -149,7 +145,16 @@ final class ControleurAccueil
     .barre-actions-lot select{padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;background:#fff}
     .btn-appliquer-lot{padding:10px 14px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:700;cursor:pointer}
     .resume-selection{color:#4b5563;font-size:13px;font-weight:700}
-    .colonne-selection{position:sticky;left:0;background:#fff;z-index:2;min-width:112px;width:112px;white-space:nowrap;box-shadow:1px 0 0 #e5e7eb}
+    .barre-actions-demandes-activation{margin:14px 0 10px 0}
+    .menu-colonnes{position:relative;display:inline-flex;align-items:center}
+    .btn-colonnes{display:inline-flex;align-items:center;gap:8px}
+    .btn-colonnes::after{content:'▾';font-size:12px;line-height:1}
+    .panneau-colonnes{display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:20;min-width:260px;max-height:320px;overflow:auto;padding:10px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;box-shadow:0 12px 28px rgba(0,0,0,.12)}
+    .panneau-colonnes.ouvert{display:block}
+    .option-colonne{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:13px;cursor:pointer}
+    .option-colonne input{width:16px;height:16px;cursor:pointer}
+    .colonne-masquee{display:none}
+    .colonne-selection{position:sticky;left:0;background:#fff;z-index:2;min-width:72px;width:72px;white-space:nowrap;box-shadow:1px 0 0 #e5e7eb}
     th.colonne-selection{background:#f8fafc;z-index:5}
     th.colonne-selection,td.colonne-selection{padding-right:8px}
     .ligne-selection{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -464,54 +469,93 @@ final class ControleurAccueil
       <?php if (empty($demandesActivation)): ?>
         <p class="muted">Aucune demande d’activation enregistrée pour le moment.</p>
       <?php else: ?>
+        <div class="barre-actions-demandes-activation">
+          <div class="barre-actions-lot">
+            <div class="menu-colonnes" id="menu_colonnes_demandes_activation">
+              <button type="button" class="btn-secondaire btn-colonnes" id="btn_colonnes_demandes_activation" aria-expanded="false" aria-controls="panneau_colonnes_demandes_activation">
+                Colonnes affichées
+              </button>
+              <div class="panneau-colonnes" id="panneau_colonnes_demandes_activation">
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="voir" checked> <span>Voir</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="id" checked> <span>ID</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="statut" checked> <span>Statut</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="module" checked> <span>Module</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="version" checked> <span>Version</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="client" checked> <span>Client</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="email" checked> <span>E-mail</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="commande" checked> <span>Commande</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="domaine_principal" checked> <span>Domaine principal</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="domaines_test" checked> <span>Domaines de test</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="licence_liee" checked> <span>Licence liée</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="date_creation" checked> <span>Date création</span></label>
+                <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-demande" data-colonne="note_interne" checked> <span>Note interne</span></label>
+              </div>
+            </div>
+
+            <label class="etiquette-tout-selectionner" for="afficher_demandes_refusees">
+              <input type="checkbox" id="afficher_demandes_refusees" checked>
+              <span>Afficher les demandes refusées</span>
+            </label>
+
+            <label class="etiquette-tout-selectionner" for="afficher_demandes_terminees">
+              <input type="checkbox" id="afficher_demandes_terminees" checked>
+              <span>Afficher les demandes terminées</span>
+            </label>
+
+            <span class="resume-selection" id="resume_demandes_activation">0 demande affichée.</span>
+          </div>
+        </div>
+
         <div class="table-wrap">
           <table id="tableau-demandes-activation">
             <thead>
               <tr>
-                <th class="colonne-selection">Voir</th>
-                <th>ID</th>
-                <th>Statut</th>
-                <th>Module</th>
-                <th>Version</th>
-                <th>Client</th>
-                <th>E-mail</th>
-                <th>Commande</th>
-                <th>Domaine principal</th>
-                <th>Domaines de test</th>
-                <th>Licence liée</th>
-                <th>Date création</th>
-                <th>Note interne</th>
+                <th class="colonne-selection" data-colonne="voir">Voir</th>
+                <th data-colonne="id">ID</th>
+                <th data-colonne="statut">Statut</th>
+                <th data-colonne="module">Module</th>
+                <th data-colonne="version">Version</th>
+                <th data-colonne="client">Client</th>
+                <th data-colonne="email">E-mail</th>
+                <th data-colonne="commande">Commande</th>
+                <th data-colonne="domaine_principal">Domaine principal</th>
+                <th data-colonne="domaines_test">Domaines de test</th>
+                <th data-colonne="licence_liee">Licence liée</th>
+                <th data-colonne="date_creation">Date création</th>
+                <th data-colonne="note_interne">Note interne</th>
               </tr>
             </thead>
             <tbody>
               <?php foreach ($demandesActivation as $demande): ?>
                 <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
-                <tr>
-                  <td class="colonne-selection">
+                <tr
+                  class="ligne-demande-activation"
+                  data-filtre-statut="<?php echo htmlspecialchars($statutDemande, ENT_QUOTES, 'UTF-8'); ?>">
+                  <td class="colonne-selection" data-colonne="voir">
                     <a class="btn-voir" href="/demandes-activation/voir?id=<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">Voir</a>
                   </td>
-                  <td><?php echo (int)($demande['id_demande_activation'] ?? 0); ?></td>
-                  <td>
+                  <td data-colonne="id"><?php echo (int)($demande['id_demande_activation'] ?? 0); ?></td>
+                  <td data-colonne="statut">
                     <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>">
                       <?php echo htmlspecialchars($statutDemande !== '' ? $statutDemande : '—', ENT_QUOTES, 'UTF-8'); ?>
                     </span>
                   </td>
-                  <td><code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                  <td><code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                  <td><?php echo htmlspecialchars((string)($demande['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-email"><?php echo htmlspecialchars((string)($demande['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><code><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                  <td class="cellule-domaine"><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-domaines-test"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
-                  <td>
+                  <td data-colonne="module"><code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td data-colonne="version"><code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td data-colonne="client"><?php echo htmlspecialchars((string)($demande['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-email" data-colonne="email"><?php echo htmlspecialchars((string)($demande['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="commande"><code><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td class="cellule-domaine" data-colonne="domaine_principal"><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-domaines-test" data-colonne="domaines_test"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td data-colonne="licence_liee">
                     <?php if ((int)($demande['id_licence'] ?? 0) > 0): ?>
                       <a class="btn-voir" href="/licences/voir?id=<?php echo (int)($demande['id_licence'] ?? 0); ?>">Licence #<?php echo (int)($demande['id_licence'] ?? 0); ?></a>
                     <?php else: ?>
                       —
                     <?php endif; ?>
                   </td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td class="cellule-date" data-colonne="date_creation"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="note_interne"><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -573,6 +617,30 @@ final class ControleurAccueil
                 <span>Tout sélectionner (visibles)</span>
               </label>
 
+              <div class="menu-colonnes" id="menu_colonnes_licences">
+                <button type="button" class="btn-secondaire btn-colonnes" id="btn_colonnes_licences" aria-expanded="false" aria-controls="panneau_colonnes_licences">
+                  Colonnes affichées
+                </button>
+                <div class="panneau-colonnes" id="panneau_colonnes_licences">
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="id" checked> <span>ID</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="cle" checked> <span>Clé</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="module" checked> <span>Module</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="statut" checked> <span>Statut</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="client" checked> <span>Client</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="email" checked> <span>E-mail</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="domaine_principal" checked> <span>Domaine principal</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="domaines_test" checked> <span>Domaines de test</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="version_max" checked> <span>Version max</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="type" checked> <span>Type</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="expire_le" checked> <span>Expire le</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="fin_grace" checked> <span>Fin de grâce</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="mise_a_jour" checked> <span>Mise à jour</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="commentaire" checked> <span>Commentaire interne</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="date_creation" checked> <span>Date création</span></label>
+                  <label class="option-colonne"><input type="checkbox" class="checkbox-colonne-licence" data-colonne="date_activation" checked> <span>Date activation</span></label>
+                </div>
+              </div>
+
               <select name="action_statut_lot" id="action_statut_lot">
                 <option value="">Choisir une action</option>
                 <option value="reactiver">Réactiver</option>
@@ -591,22 +659,22 @@ final class ControleurAccueil
                         <thead>
               <tr>
                 <th class="colonne-selection">Sélection / Voir</th>
-                <th>ID</th>
-                <th>Clé</th>
-                <th>Module</th>
-                <th>Statut</th>
-                <th>Client</th>
-                <th>E-mail</th>
-                <th>Domaine principal</th>
-                <th>Domaines de test</th>
-                <th>Version max</th>
-                <th>Type</th>
-                <th>Expire le</th>
-                <th>Fin de grâce</th>
-                <th>Mise à jour</th>
-                <th>Commentaire interne</th>
-                <th>Date création</th>
-                <th>Date activation</th>
+                <th data-colonne="id">ID</th>
+                <th data-colonne="cle">Clé</th>
+                <th data-colonne="module">Module</th>
+                <th data-colonne="statut">Statut</th>
+                <th data-colonne="client">Client</th>
+                <th data-colonne="email">E-mail</th>
+                <th data-colonne="domaine_principal">Domaine principal</th>
+                <th data-colonne="domaines_test">Domaines de test</th>
+                <th data-colonne="version_max">Version max</th>
+                <th data-colonne="type">Type</th>
+                <th data-colonne="expire_le">Expire le</th>
+                <th data-colonne="fin_grace">Fin de grâce</th>
+                <th data-colonne="mise_a_jour">Mise à jour</th>
+                <th data-colonne="commentaire">Commentaire interne</th>
+                <th data-colonne="date_creation">Date création</th>
+                <th data-colonne="date_activation">Date activation</th>
               </tr>
             </thead>
             <tbody>
@@ -638,26 +706,26 @@ final class ControleurAccueil
                       <a class="btn-voir" href="/licences/voir?id=<?php echo (int)($licence['id_licence'] ?? 0); ?>">Voir</a>
                     </div>
                   </td>
-                  <td><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
-                  <td class="cellule-cle"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                  <td><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-                  <td>
+                  <td data-colonne="id"><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
+                  <td class="cellule-cle" data-colonne="cle"><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td data-colonne="module"><code><?php echo htmlspecialchars((string)($licence['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td data-colonne="statut">
                     <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatut($statut), ENT_QUOTES, 'UTF-8'); ?>">
                       <?php echo htmlspecialchars($statut !== '' ? $statut : '—', ENT_QUOTES, 'UTF-8'); ?>
                     </span>
                   </td>
-                  <td><?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-email"><?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-domaine"><?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-domaines-test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo nl2br(htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="client"><?php echo htmlspecialchars((string)($licence['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-email" data-colonne="email"><?php echo htmlspecialchars((string)($licence['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-domaine" data-colonne="domaine_principal"><?php echo htmlspecialchars((string)($licence['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-domaines-test" data-colonne="domaines_test"><?php echo htmlspecialchars((string)($licence['domaines_test_actifs_texte'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="version_max"><?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="type"><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date" data-colonne="expire_le"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date" data-colonne="fin_grace"><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date" data-colonne="mise_a_jour"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td data-colonne="commentaire"><?php echo nl2br(htmlspecialchars((string)($licence['commentaire_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td class="cellule-date" data-colonne="date_creation"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-date" data-colonne="date_activation"><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_activation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -673,6 +741,11 @@ final class ControleurAccueil
           var boutonReset = document.getElementById('btn_reinit_filtres_licences');
           var resume = document.getElementById('resume_filtres_licences');
           var lignes = document.querySelectorAll('#tableau-licences tbody tr.ligne-licence');
+          var menuColonnes = document.getElementById('menu_colonnes_licences');
+          var boutonColonnes = document.getElementById('btn_colonnes_licences');
+          var panneauColonnes = document.getElementById('panneau_colonnes_licences');
+          var casesColonnes = document.querySelectorAll('.checkbox-colonne-licence');
+          var cleStockageColonnes = 'sr_licences_colonnes_visibles_v1';
 
           if (!champRecherche || !champStatut || !champType || !champModule || !champDomaine || !boutonReset || !resume || !lignes.length) {
             return;
@@ -680,6 +753,133 @@ final class ControleurAccueil
 
           function normaliser(valeur) {
             return (valeur || '').toString().toLowerCase().trim();
+          }
+
+          function clesColonnesDisponibles() {
+            return Array.prototype.map.call(casesColonnes, function (caseColonne) {
+              return caseColonne.getAttribute('data-colonne') || '';
+            }).filter(Boolean);
+          }
+
+          function lireColonnesDepuisStockage() {
+            try {
+              var brut = window.localStorage.getItem(cleStockageColonnes);
+              if (!brut) {
+                return null;
+              }
+              var donnees = JSON.parse(brut);
+              return Array.isArray(donnees) ? donnees : null;
+            } catch (e) {
+              return null;
+            }
+          }
+
+          function enregistrerColonnesDansStockage() {
+            try {
+              var visibles = Array.prototype.filter.call(casesColonnes, function (caseColonne) {
+                return caseColonne.checked;
+              }).map(function (caseColonne) {
+                return caseColonne.getAttribute('data-colonne') || '';
+              }).filter(Boolean);
+
+              window.localStorage.setItem(cleStockageColonnes, JSON.stringify(visibles));
+            } catch (e) {
+            }
+          }
+
+          function mettreAJourLibelleColonnes() {
+            if (!boutonColonnes || !casesColonnes.length) {
+              return;
+            }
+
+            var total = casesColonnes.length;
+            var visibles = Array.prototype.filter.call(casesColonnes, function (caseColonne) {
+              return caseColonne.checked;
+            }).length;
+
+            boutonColonnes.textContent = 'Colonnes affichées (' + visibles + '/' + total + ')';
+          }
+
+          function appliquerVisibiliteColonnes() {
+            if (!casesColonnes.length) {
+              return;
+            }
+
+            Array.prototype.forEach.call(casesColonnes, function (caseColonne) {
+              var cle = caseColonne.getAttribute('data-colonne') || '';
+              if (!cle) {
+                return;
+              }
+
+              var visible = caseColonne.checked;
+              var elements = document.querySelectorAll('#tableau-licences [data-colonne="' + cle + '"]');
+
+              Array.prototype.forEach.call(elements, function (element) {
+                element.classList.toggle('colonne-masquee', !visible);
+              });
+            });
+
+            mettreAJourLibelleColonnes();
+            enregistrerColonnesDansStockage();
+          }
+
+          function initialiserVisibiliteColonnes() {
+            if (!casesColonnes.length) {
+              return;
+            }
+
+            var disponibles = clesColonnesDisponibles();
+            var visibles = lireColonnesDepuisStockage();
+
+            if (visibles && visibles.length) {
+              Array.prototype.forEach.call(casesColonnes, function (caseColonne) {
+                var cle = caseColonne.getAttribute('data-colonne') || '';
+                caseColonne.checked = visibles.indexOf(cle) !== -1;
+              });
+            } else {
+              Array.prototype.forEach.call(casesColonnes, function (caseColonne) {
+                caseColonne.checked = true;
+              });
+            }
+
+            if (!Array.prototype.some.call(casesColonnes, function (caseColonne) { return caseColonne.checked; })) {
+              Array.prototype.forEach.call(casesColonnes, function (caseColonne) {
+                caseColonne.checked = disponibles.indexOf(caseColonne.getAttribute('data-colonne') || '') !== -1;
+              });
+            }
+
+            Array.prototype.forEach.call(casesColonnes, function (caseColonne) {
+              caseColonne.addEventListener('change', function () {
+                if (!Array.prototype.some.call(casesColonnes, function (element) { return element.checked; })) {
+                  caseColonne.checked = true;
+                }
+                appliquerVisibiliteColonnes();
+              });
+            });
+
+            if (boutonColonnes && panneauColonnes && menuColonnes) {
+              boutonColonnes.addEventListener('click', function (event) {
+                event.preventDefault();
+                var ouvert = panneauColonnes.classList.toggle('ouvert');
+                boutonColonnes.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+              });
+
+              document.addEventListener('click', function (event) {
+                if (!menuColonnes.contains(event.target)) {
+                  panneauColonnes.classList.remove('ouvert');
+                  boutonColonnes.setAttribute('aria-expanded', 'false');
+                }
+              });
+
+              document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                  panneauColonnes.classList.remove('ouvert');
+                  boutonColonnes.setAttribute('aria-expanded', 'false');
+                }
+              });
+            }
+
+            appliquerVisibiliteColonnes();
           }
 
           function appliquerFiltres() {
@@ -738,6 +938,7 @@ final class ControleurAccueil
             appliquerFiltres();
           });
 
+          initialiserVisibiliteColonnes();
           appliquerFiltres();
         })();
         </script>
@@ -856,6 +1057,181 @@ final class ControleurAccueil
   })();
   </script>
 
+  <script>
+  (function () {
+    var tableau = document.getElementById('tableau-demandes-activation');
+    if (!tableau) {
+      return;
+    }
+
+    var menuColonnes = document.getElementById('menu_colonnes_demandes_activation');
+    var boutonColonnes = document.getElementById('btn_colonnes_demandes_activation');
+    var panneauColonnes = document.getElementById('panneau_colonnes_demandes_activation');
+    var casesColonnes = Array.prototype.slice.call(document.querySelectorAll('.checkbox-colonne-demande'));
+    var caseAfficherRefusees = document.getElementById('afficher_demandes_refusees');
+    var caseAfficherTerminees = document.getElementById('afficher_demandes_terminees');
+    var resume = document.getElementById('resume_demandes_activation');
+    var lignes = Array.prototype.slice.call(document.querySelectorAll('#tableau-demandes-activation tbody tr.ligne-demande-activation'));
+    var cleColonnes = 'sr_licences_colonnes_demandes_activation_v1';
+    var cleAfficherRefusees = 'sr_licences_afficher_demandes_refusees_v1';
+    var cleAfficherTerminees = 'sr_licences_afficher_demandes_terminees_v1';
+
+    if (!menuColonnes || !boutonColonnes || !panneauColonnes || !casesColonnes.length || !caseAfficherRefusees || !caseAfficherTerminees || !resume || !lignes.length) {
+      return;
+    }
+
+    function lireJson(cle) {
+      try {
+        var brut = window.localStorage.getItem(cle);
+        return brut ? JSON.parse(brut) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function ecrireJson(cle, valeur) {
+      try {
+        window.localStorage.setItem(cle, JSON.stringify(valeur));
+      } catch (e) {
+      }
+    }
+
+    function ecrireTexte(cle, valeur) {
+      try {
+        window.localStorage.setItem(cle, valeur);
+      } catch (e) {
+      }
+    }
+
+    function lireTexte(cle) {
+      try {
+        return window.localStorage.getItem(cle);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function mettreAJourLibelleColonnes() {
+      var visibles = casesColonnes.filter(function (caseColonne) {
+        return caseColonne.checked;
+      }).length;
+
+      boutonColonnes.textContent = 'Colonnes affichées (' + visibles + '/' + casesColonnes.length + ')';
+    }
+
+    function appliquerVisibiliteColonnes() {
+      casesColonnes.forEach(function (caseColonne) {
+        var cle = caseColonne.getAttribute('data-colonne') || '';
+        if (!cle) {
+          return;
+        }
+
+        var elements = document.querySelectorAll('#tableau-demandes-activation [data-colonne="' + cle + '"]');
+        elements.forEach(function (element) {
+          element.classList.toggle('colonne-masquee', !caseColonne.checked);
+        });
+      });
+
+      mettreAJourLibelleColonnes();
+      ecrireJson(cleColonnes, casesColonnes.filter(function (caseColonne) {
+        return caseColonne.checked;
+      }).map(function (caseColonne) {
+        return caseColonne.getAttribute('data-colonne') || '';
+      }));
+    }
+
+    function appliquerFiltresDemandes() {
+      var afficherRefusees = !!caseAfficherRefusees.checked;
+      var afficherTerminees = !!caseAfficherTerminees.checked;
+      var visibles = 0;
+
+      lignes.forEach(function (ligne) {
+        var statut = (ligne.getAttribute('data-filtre-statut') || '').toLowerCase().trim();
+        var masquer = false;
+
+        if (!afficherRefusees && statut === 'refusee') {
+          masquer = true;
+        }
+
+        if (!afficherTerminees && statut === 'terminee') {
+          masquer = true;
+        }
+
+        ligne.classList.toggle('ligne-masquee', masquer);
+        if (!masquer) {
+          visibles += 1;
+        }
+      });
+
+      resume.textContent = visibles + ' demande(s) affichée(s) sur ' + lignes.length + '.';
+      ecrireTexte(cleAfficherRefusees, afficherRefusees ? '1' : '0');
+      ecrireTexte(cleAfficherTerminees, afficherTerminees ? '1' : '0');
+    }
+
+    var colonnesSauvegardees = lireJson(cleColonnes);
+    if (Array.isArray(colonnesSauvegardees) && colonnesSauvegardees.length) {
+      casesColonnes.forEach(function (caseColonne) {
+        var cle = caseColonne.getAttribute('data-colonne') || '';
+        caseColonne.checked = colonnesSauvegardees.indexOf(cle) !== -1;
+      });
+    }
+
+    if (!casesColonnes.some(function (caseColonne) { return caseColonne.checked; })) {
+      casesColonnes.forEach(function (caseColonne) {
+        caseColonne.checked = true;
+      });
+    }
+
+    var afficherRefuseesSauvegarde = lireTexte(cleAfficherRefusees);
+    if (afficherRefuseesSauvegarde === '0') {
+      caseAfficherRefusees.checked = false;
+    } else if (afficherRefuseesSauvegarde === '1') {
+      caseAfficherRefusees.checked = true;
+    }
+
+    var afficherTermineesSauvegarde = lireTexte(cleAfficherTerminees);
+    if (afficherTermineesSauvegarde === '0') {
+      caseAfficherTerminees.checked = false;
+    } else if (afficherTermineesSauvegarde === '1') {
+      caseAfficherTerminees.checked = true;
+    }
+
+    casesColonnes.forEach(function (caseColonne) {
+      caseColonne.addEventListener('change', function () {
+        if (!casesColonnes.some(function (element) { return element.checked; })) {
+          caseColonne.checked = true;
+        }
+        appliquerVisibiliteColonnes();
+      });
+    });
+
+    caseAfficherRefusees.addEventListener('change', appliquerFiltresDemandes);
+    caseAfficherTerminees.addEventListener('change', appliquerFiltresDemandes);
+
+    boutonColonnes.addEventListener('click', function (event) {
+      event.preventDefault();
+      var ouvert = panneauColonnes.classList.toggle('ouvert');
+      boutonColonnes.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!menuColonnes.contains(event.target)) {
+        panneauColonnes.classList.remove('ouvert');
+        boutonColonnes.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        panneauColonnes.classList.remove('ouvert');
+        boutonColonnes.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    appliquerVisibiliteColonnes();
+    appliquerFiltresDemandes();
+  })();
+  </script>
 </body>
 </html>
         <?php
@@ -1004,10 +1380,10 @@ final class ControleurAccueil
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Clé</th>
-          <th>Type</th>
-          <th>Statut</th>
+          <th data-colonne="id">ID</th>
+          <th data-colonne="cle">Clé</th>
+          <th data-colonne="type">Type</th>
+          <th data-colonne="statut">Statut</th>
           <th>Expiration actuelle</th>
           <th>Grâce actuelle</th>
         </tr>
@@ -1015,9 +1391,9 @@ final class ControleurAccueil
       <tbody>
         <?php foreach ($licences as $licence): ?>
           <tr>
-            <td><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
+            <td data-colonne="id"><?php echo (int)($licence['id_licence'] ?? 0); ?></td>
             <td><code><?php echo htmlspecialchars((string)($licence['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
-            <td><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td data-colonne="type"><?php echo htmlspecialchars((string)($licence['type_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
             <td><?php echo htmlspecialchars((string)($licence['statut'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
             <td><?php echo htmlspecialchars($this->formaterDate((string)($licence['date_expiration'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
             <td><?php echo htmlspecialchars($this->formaterDate((string)($licence['grace_jusqu_a'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
