@@ -663,6 +663,10 @@ final class ServiceLicence
                 continue;
             }
 
+            if (!$this->statutJustifieSurveillanceSilencieuse((string)($entree['status'] ?? ''))) {
+                continue;
+            }
+
             $nextCheckAt = trim((string)($entree['next_check_at'] ?? ''));
             $timestampNext = $nextCheckAt !== '' ? strtotime($nextCheckAt) : false;
             if ($timestampNext === false) {
@@ -683,6 +687,11 @@ final class ServiceLicence
         });
 
         return $alertes;
+    }
+
+    private function statutJustifieSurveillanceSilencieuse(string $statut): bool
+    {
+        return in_array($statut, ['active', 'grace', 'suspendue'], true);
     }
 
     public function journaliserAlertesSilenceVerification(array $alertes): void

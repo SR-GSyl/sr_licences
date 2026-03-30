@@ -1766,10 +1766,10 @@ final class ControleurAccueil
                     'email_client' => (string)($_POST['email_client'] ?? ''),
                     'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
                     'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
-                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
-                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
-                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
-                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
+                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? '1'),
+                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'annees'),
+                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? '1'),
+                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'mois'),
                     'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
                     'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
                     'domaines_test' => (string)($_POST['domaines_test'] ?? ''),
@@ -1944,7 +1944,7 @@ final class ControleurAccueil
           <div class="grille-form">
             <div class="champ champ-dates-abonnement" id="bloc_validite_valeur_modification">
               <label for="validite_valeur">Nouvelle durée de validité</label>
-              <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" placeholder="Laisser vide pour conserver l’échéance actuelle">
+              <input type="number" min="1" step="1" id="validite_valeur" name="validite_valeur" value="1">
             </div>
 
             <div class="champ champ-dates-abonnement" id="bloc_validite_unite_modification">
@@ -1952,22 +1952,22 @@ final class ControleurAccueil
               <select id="validite_unite" name="validite_unite">
                 <option value="jours">jours</option>
                 <option value="semaines">semaines</option>
-                <option value="mois" selected>mois</option>
-                <option value="annees">années</option>
+                <option value="mois">mois</option>
+                <option value="annees" selected>années</option>
               </select>
             </div>
 
             <div class="champ champ-dates-abonnement" id="bloc_grace_valeur_modification">
               <label for="grace_valeur">Nouvelle durée de grâce</label>
-              <input type="number" min="0" step="1" id="grace_valeur" name="grace_valeur" placeholder="Laisser vide pour conserver l’existant">
+              <input type="number" min="0" step="1" id="grace_valeur" name="grace_valeur" value="1">
             </div>
 
             <div class="champ champ-dates-abonnement" id="bloc_grace_unite_modification">
               <label for="grace_unite">Unité de grâce</label>
               <select id="grace_unite" name="grace_unite">
-                <option value="jours" selected>jours</option>
+                <option value="jours">jours</option>
                 <option value="semaines">semaines</option>
-                <option value="mois">mois</option>
+                <option value="mois" selected>mois</option>
                 <option value="annees">années</option>
               </select>
             </div>
@@ -2047,8 +2047,14 @@ final class ControleurAccueil
           if (!champ) {
             return;
           }
-          if (champ.tagName === 'SELECT') {
-            champ.selectedIndex = 0;
+          if (champ.id === 'validite_valeur') {
+            champ.value = '1';
+          } else if (champ.id === 'validite_unite') {
+            champ.value = 'annees';
+          } else if (champ.id === 'grace_valeur') {
+            champ.value = '1';
+          } else if (champ.id === 'grace_unite') {
+            champ.value = 'mois';
           } else {
             champ.value = '';
           }
