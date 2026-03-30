@@ -137,6 +137,10 @@ switch ($chemin) {
         (new ControleurAccueil($config))->traiterChangementStatutLicencesLot();
         break;
 
+    case '/demandes-activation/voir':
+        (new ControleurAccueil($config))->afficherDemandeActivation();
+        break;
+
     case '/demandes-activation/decision':
         (new ControleurAccueil($config))->traiterDecisionDemandeActivation();
         break;

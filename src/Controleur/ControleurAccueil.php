@@ -460,131 +460,58 @@ final class ControleurAccueil
       <?php if (empty($demandesActivation)): ?>
         <p class="muted">Aucune demande d’activation enregistrée pour le moment.</p>
       <?php else: ?>
-        <div class="grille" style="margin-top:16px;">
-          <?php foreach ($demandesActivation as $demande): ?>
-            <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
-            <div class="carte">
-              <div class="barre" style="margin-bottom:10px;">
-                <h3 class="titre" style="margin:0;">Demande #<?php echo (int)($demande['id_demande_activation'] ?? 0); ?></h3>
-                <span class="badge <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($statutDemande, ENT_QUOTES, 'UTF-8'); ?></span>
-              </div>
-
-              <p class="muted" style="margin-top:0;">
-                Module : <code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
-                — Version : <code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code>
-              </p>
-
-              <div class="grille-form">
-                <div class="champ">
-                  <label>Client</label>
-                  <div><?php echo htmlspecialchars((string)($demande['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                </div>
-                <div class="champ">
-                  <label>E-mail</label>
-                  <div><?php echo htmlspecialchars((string)($demande['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                </div>
-                <div class="champ">
-                  <label>N° de commande</label>
-                  <div><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-                </div>
-                <div class="champ">
-                  <label>Domaine principal</label>
-                  <div><code><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div>
-                </div>
-                <div class="champ" style="grid-column:1/-1;">
-                  <label>Domaines de test</label>
-                  <div><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div>
-                </div>
-                <div class="champ">
-                  <label>Créée le</label>
-                  <div><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
-                </div>
-                <div class="champ">
-                  <label>Licence liée</label>
-                  <div><?php echo (int)($demande['id_licence'] ?? 0) > 0 ? '#' . (int)$demande['id_licence'] : '—'; ?></div>
-                </div>
-                <div class="champ" style="grid-column:1/-1;">
-                  <label>Note interne</label>
-                  <div><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div>
-                </div>
-              </div>
-
-              <?php if (in_array($statutDemande, ['en_attente', 'refusee'], true)): ?>
-                <form method="post" action="/demandes-activation/decision" class="formulaire" style="margin-top:14px;">
-                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
-                  <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
-                  <input type="hidden" name="action_decision" value="valider">
-
-                  <div class="grille-form">
-                    <div class="champ">
-                      <label>Type de licence</label>
-                      <select name="type_licence">
-                        <option value="perpetuelle">perpétuelle</option>
-                        <option value="abonnement">abonnement</option>
-                      </select>
-                    </div>
-                    <div class="champ">
-                      <label>Version max autorisée</label>
-                      <input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*">
-                    </div>
-                    <div class="champ">
-                      <label>Durée de validité</label>
-                      <input type="number" min="1" step="1" name="validite_valeur" value="12">
-                    </div>
-                    <div class="champ">
-                      <label>Unité de validité</label>
-                      <select name="validite_unite">
-                        <option value="jours">jours</option>
-                        <option value="semaines">semaines</option>
-                        <option value="mois" selected>mois</option>
-                        <option value="annees">années</option>
-                      </select>
-                    </div>
-                    <div class="champ">
-                      <label>Durée de grâce</label>
-                      <input type="number" min="0" step="1" name="grace_valeur" value="7">
-                    </div>
-                    <div class="champ">
-                      <label>Unité de grâce</label>
-                      <select name="grace_unite">
-                        <option value="jours" selected>jours</option>
-                        <option value="semaines">semaines</option>
-                        <option value="mois">mois</option>
-                        <option value="annees">années</option>
-                      </select>
-                    </div>
-                    <div class="champ" style="grid-column:1/-1;">
-                      <label>Note interne de validation</label>
-                      <textarea name="note_interne" placeholder="Note interne facultative"></textarea>
-                    </div>
-                  </div>
-
-                  <div class="actions-form">
-                    <button type="submit">Valider la demande et créer la licence</button>
-                  </div>
-                </form>
-              <?php endif; ?>
-
-              <?php if (in_array($statutDemande, ['en_attente', 'validee'], true)): ?>
-                <form method="post" action="/demandes-activation/decision" class="formulaire" style="margin-top:14px;">
-                  <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
-                  <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
-                  <input type="hidden" name="action_decision" value="refuser">
-
-                  <div class="grille-form">
-                    <div class="champ" style="grid-column:1/-1;">
-                      <label>Motif / note interne de refus</label>
-                      <textarea name="note_interne" placeholder="Motif facultatif"></textarea>
-                    </div>
-                  </div>
-
-                  <div class="actions-form">
-                    <button type="submit">Refuser la demande</button>
-                  </div>
-                </form>
-              <?php endif; ?>
-            </div>
-          <?php endforeach; ?>
+        <div class="table-wrap">
+          <table id="tableau-demandes-activation">
+            <thead>
+              <tr>
+                <th class="colonne-selection">Voir</th>
+                <th>ID</th>
+                <th>Statut</th>
+                <th>Module</th>
+                <th>Version</th>
+                <th>Client</th>
+                <th>E-mail</th>
+                <th>Commande</th>
+                <th>Domaine principal</th>
+                <th>Domaines de test</th>
+                <th>Licence liée</th>
+                <th>Date création</th>
+                <th>Note interne</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($demandesActivation as $demande): ?>
+                <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
+                <tr>
+                  <td class="colonne-selection">
+                    <a class="btn-voir" href="/demandes-activation/voir?id=<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">Voir</a>
+                  </td>
+                  <td><?php echo (int)($demande['id_demande_activation'] ?? 0); ?></td>
+                  <td>
+                    <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>">
+                      <?php echo htmlspecialchars($statutDemande !== '' ? $statutDemande : '—', ENT_QUOTES, 'UTF-8'); ?>
+                    </span>
+                  </td>
+                  <td><code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td><code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td><?php echo htmlspecialchars((string)($demande['nom_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-email"><?php echo htmlspecialchars((string)($demande['email_client'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><code><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td class="cellule-domaine"><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td class="cellule-domaines-test"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td>
+                    <?php if ((int)($demande['id_licence'] ?? 0) > 0): ?>
+                      <a class="btn-voir" href="/licences/voir?id=<?php echo (int)($demande['id_licence'] ?? 0); ?>">Licence #<?php echo (int)($demande['id_licence'] ?? 0); ?></a>
+                    <?php else: ?>
+                      —
+                    <?php endif; ?>
+                  </td>
+                  <td class="cellule-date"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
         </div>
       <?php endif; ?>
     </div>
@@ -1139,6 +1066,135 @@ final class ControleurAccueil
           <a class="bouton-secondaire" href="/">Annuler</a>
         </div>
       </form>
+    </div>
+  </div>
+</body>
+</html>
+        <?php
+        exit;
+    }
+
+
+    public function afficherDemandeActivation(): void
+    {
+        $idDemandeActivation = (int)($_GET['id'] ?? 0);
+
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $serviceDemandesActivation = new ServiceDemandeActivation(
+                new DemandeActivationRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+            $demande = $serviceDemandesActivation->obtenirDemandePourAdmin($idDemandeActivation);
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Chargement impossible : ' . $e->getMessage();
+            header('Location: /');
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Demande d’activation #<?php echo (int)($demande['id_demande_activation'] ?? 0); ?> - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f8fafc;color:#111827}
+    .page{max-width:1180px;margin:32px auto;background:#fff;border:1px solid #dbe3ea;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+    .barre{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .badge-statut{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px;line-height:1.2;white-space:nowrap}
+    .statut-active{background:#dcfce7;color:#166534;border-color:#86efac}
+    .statut-suspendue{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+    .statut-revoquee{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .statut-expiree{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+    .statut-invalide{background:#e5e7eb;color:#374151;border-color:#cbd5e1}
+    .muted{color:#4b5563}
+    .grille-fiche{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:20px}
+    .carte-fiche{border:1px solid #dbe3ea;border-radius:14px;padding:16px;background:#fff}
+    .libelle{margin:0 0 8px 0;font-size:13px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.02em}
+    .contenu{font-size:16px;line-height:1.45;word-break:break-word}
+    .contenu code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
+    .contenu.commentaire{white-space:pre-wrap}
+    .formulaire{margin-top:24px;padding:18px;border:1px solid #dbe3ea;border-radius:14px;background:#fbfdff}
+    .grille-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .champ label{display:block;margin-bottom:6px;font-weight:700}
+    .champ input,.champ select,.champ textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}
+    .champ textarea{min-height:96px;resize:vertical}
+    .actions-form{margin-top:16px}
+    .actions-form button{padding:11px 16px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:700;cursor:pointer}
+    .bloc-actions{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
+    a.bouton-retour{display:inline-block;padding:10px 14px;border-radius:10px;background:#111827;color:#fff;text-decoration:none;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="barre">
+      <div>
+        <h1 style="margin:0 0 8px 0;">Demande d’activation #<?php echo (int)($demande['id_demande_activation'] ?? 0); ?></h1>
+        <p class="muted" style="margin:0;">Consultation détaillée d’une demande d’activation.</p>
+      </div>
+      <div>
+        <a class="bouton-retour" href="/">Retour à la liste</a>
+      </div>
+    </div>
+
+    <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
+
+    <div class="grille-fiche">
+      <div class="carte-fiche"><div class="libelle">ID</div><div class="contenu"><?php echo (int)($demande['id_demande_activation'] ?? 0); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Statut</div><div class="contenu"><span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($statutDemande !== '' ? $statutDemande : '—', ENT_QUOTES, 'UTF-8'); ?></span></div></div>
+      <div class="carte-fiche"><div class="libelle">Module</div><div class="contenu"><code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div></div>
+      <div class="carte-fiche"><div class="libelle">Version module</div><div class="contenu"><code><?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div></div>
+      <div class="carte-fiche"><div class="libelle">Nom client</div><div class="contenu"><?php echo htmlspecialchars((string)($demande['nom_client'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">E-mail client</div><div class="contenu"><?php echo htmlspecialchars((string)($demande['email_client'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">N° de commande</div><div class="contenu"><code><?php echo htmlspecialchars((string)($demande['numero_commande'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></code></div></div>
+      <div class="carte-fiche"><div class="libelle">Domaine principal</div><div class="contenu"><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Domaines de test</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date création</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date validation</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_validation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date refus</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_refus'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date consommation</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_consommation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Dernière mise à jour</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Licence liée</div><div class="contenu"><?php if ((int)($demande['id_licence'] ?? 0) > 0): ?><a class="bouton-retour" href="/licences/voir?id=<?php echo (int)($demande['id_licence'] ?? 0); ?>">Voir la licence #<?php echo (int)($demande['id_licence'] ?? 0); ?></a><?php else: ?>—<?php endif; ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Note interne</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+    </div>
+
+    <?php if (in_array($statutDemande, ['en_attente', 'refusee'], true)): ?>
+      <form method="post" action="/demandes-activation/decision" class="formulaire">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
+        <input type="hidden" name="action_decision" value="valider">
+        <h2 style="margin-top:0;">Valider la demande et créer la licence</h2>
+        <div class="grille-form">
+          <div class="champ"><label>Type de licence</label><select name="type_licence"><option value="perpetuelle">perpétuelle</option><option value="abonnement">abonnement</option></select></div>
+          <div class="champ"><label>Version max autorisée</label><input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*"></div>
+          <div class="champ"><label>Durée de validité</label><input type="number" min="1" step="1" name="validite_valeur" value="12"></div>
+          <div class="champ"><label>Unité de validité</label><select name="validite_unite"><option value="jours">jours</option><option value="semaines">semaines</option><option value="mois" selected>mois</option><option value="annees">années</option></select></div>
+          <div class="champ"><label>Durée de grâce</label><input type="number" min="0" step="1" name="grace_valeur" value="7"></div>
+          <div class="champ"><label>Unité de grâce</label><select name="grace_unite"><option value="jours" selected>jours</option><option value="semaines">semaines</option><option value="mois">mois</option><option value="annees">années</option></select></div>
+          <div class="champ" style="grid-column:1/-1;"><label>Note interne de validation</label><textarea name="note_interne" placeholder="Note interne facultative"></textarea></div>
+        </div>
+        <div class="actions-form"><button type="submit">Valider la demande et créer la licence</button></div>
+      </form>
+    <?php endif; ?>
+
+    <?php if (in_array($statutDemande, ['en_attente', 'validee'], true)): ?>
+      <form method="post" action="/demandes-activation/decision" class="formulaire">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="id_demande_activation" value="<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">
+        <input type="hidden" name="action_decision" value="refuser">
+        <h2 style="margin-top:0;">Refuser la demande</h2>
+        <div class="grille-form">
+          <div class="champ" style="grid-column:1/-1;"><label>Motif / note interne de refus</label><textarea name="note_interne" placeholder="Motif facultatif"></textarea></div>
+        </div>
+        <div class="actions-form"><button type="submit">Refuser la demande</button></div>
+      </form>
+    <?php endif; ?>
+
+    <div class="bloc-actions">
+      <a class="bouton-retour" href="/">Retour à la liste</a>
     </div>
   </div>
 </body>

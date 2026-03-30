@@ -25,6 +25,20 @@ final class ServiceDemandeActivation
         return $this->demandeActivationRepository->listerDemandesActivation($limit);
     }
 
+    public function obtenirDemandePourAdmin(int $idDemandeActivation): array
+    {
+        if ($idDemandeActivation <= 0) {
+            throw new InvalidArgumentException('Identifiant de demande invalide.');
+        }
+
+        $demande = $this->demandeActivationRepository->trouverDemandeParId($idDemandeActivation);
+        if ($demande === null) {
+            throw new InvalidArgumentException('Demande d’activation introuvable.');
+        }
+
+        return $demande;
+    }
+
     public function demanderActivation(array $donnees): array
     {
         $codeModule = trim((string)($donnees['code_module'] ?? $donnees['module'] ?? ''));
