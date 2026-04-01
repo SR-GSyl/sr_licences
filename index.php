@@ -165,6 +165,10 @@ switch ($chemin) {
         (new ControleurApiLicence($config))->verifierActivation();
         break;
 
+    case '/api/demandes-activation/surveillance':
+        (new ControleurAccueil($config))->apiSurveillanceDemandesActivation();
+        break;
+
     default:
         http_response_code(404);
         header('Content-Type: text/plain; charset=UTF-8');

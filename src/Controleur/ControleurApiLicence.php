@@ -69,7 +69,10 @@ final class ControleurApiLicence
                 new LicenceRepository($pdo)
             );
 
-            $resultat = $service->demanderActivation(Requete::donneesEntree());
+            $donneesEntree = Requete::donneesEntree();
+            $resultat = $service->demanderActivation($donneesEntree);
+            $this->envoyerNotificationNouvelleDemandeActivation($resultat, $donneesEntree);
+
             ReponseJson::envoyer($resultat, 200);
         } catch (InvalidArgumentException $e) {
             ReponseJson::envoyer([
@@ -109,4 +112,65 @@ final class ControleurApiLicence
             ], 500);
         }
     }
+
+
+    private function envoyerNotificationNouvelleDemandeActivation(array $resultat, array $donneesEntree): void
+    {
+        $notifications = is_array($this->config['notifications'] ?? null) ? $this->config['notifications'] : [];
+
+        $destinataire = trim((string)($notifications['email_destinataire_activation'] ?? $notifications['email_destinataire'] ?? ''));
+        if ($destinataire === '' || filter_var($destinataire, FILTER_VALIDATE_EMAIL) === false) {
+            return;
+        }
+
+        $expediteur = trim((string)($notifications['email_expediteur'] ?? ''));
+        $prefixeSujet = trim((string)($notifications['prefixe_sujet'] ?? '[SR Licences]'));
+
+        $idDemande = (int)($resultat['id_demande_activation'] ?? 0);
+        $codeModule = trim((string)($donneesEntree['code_module'] ?? $donneesEntree['module'] ?? ''));
+        $versionModule = trim((string)($donneesEntree['version_module'] ?? $donneesEntree['version'] ?? ''));
+        $nomClient = trim((string)($donneesEntree['nom_client'] ?? ''));
+        $emailClient = trim((string)($donneesEntree['email_client'] ?? ''));
+        $numeroCommande = trim((string)($donneesEntree['numero_commande'] ?? ''));
+        $domainePrincipal = trim((string)($donneesEntree['domaine_principal'] ?? $donneesEntree['domain'] ?? $donneesEntree['domaine'] ?? ''));
+        $domainesTest = trim((string)($donneesEntree['domaines_test'] ?? ''));
+
+        $baseAdmin = trim((string)($this->config['application_url_admin'] ?? $this->config['application_url'] ?? ''));
+        $lienDemande = $baseAdmin !== ''
+            ? rtrim($baseAdmin, '/') . '/demandes-activation/voir?id=' . $idDemande
+            : '';
+
+        $sujet = trim($prefixeSujet . ' Nouvelle demande d’activation #' . $idDemande);
+
+        $message = implode("\n", array_filter([
+            'Une nouvelle demande d’activation a été enregistrée.',
+            '',
+            'ID : ' . $idDemande,
+            $codeModule !== '' ? 'Module : ' . $codeModule : '',
+            $versionModule !== '' ? 'Version module : ' . $versionModule : '',
+            $nomClient !== '' ? 'Client : ' . $nomClient : '',
+            $emailClient !== '' ? 'E-mail client : ' . $emailClient : '',
+            $numeroCommande !== '' ? 'Commande : ' . $numeroCommande : '',
+            $domainePrincipal !== '' ? 'Domaine principal : ' . $domainePrincipal : '',
+            $domainesTest !== '' ? 'Domaines de test : ' . $domainesTest : '',
+            $lienDemande !== '' ? 'Lien admin : ' . $lienDemande : '',
+        ]));
+
+        $headers = [
+            'MIME-Version: 1.0',
+            'Content-Type: text/plain; charset=UTF-8',
+        ];
+
+        if ($expediteur !== '' && filter_var($expediteur, FILTER_VALIDATE_EMAIL) !== false) {
+            $headers[] = 'From: ' . $expediteur;
+        }
+
+        @mail($destinataire, $this->encoderSujetUtf8($sujet), $message, implode("\r\n", $headers));
+    }
+
+    private function encoderSujetUtf8(string $sujet): string
+    {
+        return '=?UTF-8?B?' . base64_encode($sujet) . '?=';
+    }
+
 }

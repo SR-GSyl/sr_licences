@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SrLicences\Controleur;
 
 use SrLicences\Config\BaseDeDonnees;
+use SrLicences\Http\ReponseJson;
 use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\LicenceRepository;
 use SrLicences\Service\ServiceDemandeActivation;
@@ -446,23 +447,23 @@ final class ControleurAccueil
       <div class="grille">
         <div class="carte">
           <h3 class="titre">Total demandes</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['total'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-total"><?php echo (int)($statistiquesDemandesActivation['total'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">En attente</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['en_attente'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-en-attente"><?php echo (int)($statistiquesDemandesActivation['en_attente'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Validées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['validee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-validees"><?php echo (int)($statistiquesDemandesActivation['validee'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Refusées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['refusee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-refusees"><?php echo (int)($statistiquesDemandesActivation['refusee'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Terminées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesActivation['terminee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-terminees"><?php echo (int)($statistiquesDemandesActivation['terminee'] ?? 0); ?></div>
         </div>
       </div>
 
@@ -505,6 +506,8 @@ final class ControleurAccueil
             <span class="resume-selection" id="resume_demandes_activation">0 demande affichée.</span>
           </div>
         </div>
+
+        <div id="sr-licences-alerte-demandes" class="alerte-ok" style="display:none;"></div>
 
         <div class="table-wrap">
           <table id="tableau-demandes-activation">
@@ -1232,12 +1235,175 @@ final class ControleurAccueil
     appliquerFiltresDemandes();
   })();
   </script>
+
+  <script>
+  (function () {
+    var url = '/api/demandes-activation/surveillance';
+    var blocAlerte = document.getElementById('sr-licences-alerte-demandes');
+    var compteurTotal = document.getElementById('sr-demandes-total');
+    var compteurAttente = document.getElementById('sr-demandes-en-attente');
+    var compteurValidees = document.getElementById('sr-demandes-validees');
+    var compteurRefusees = document.getElementById('sr-demandes-refusees');
+    var compteurTerminees = document.getElementById('sr-demandes-terminees');
+
+    var etatCourant = {
+      total: <?php echo (int)($statistiquesDemandesActivation['total'] ?? 0); ?>,
+      en_attente: <?php echo (int)($statistiquesDemandesActivation['en_attente'] ?? 0); ?>,
+      validee: <?php echo (int)($statistiquesDemandesActivation['validee'] ?? 0); ?>,
+      refusee: <?php echo (int)($statistiquesDemandesActivation['refusee'] ?? 0); ?>,
+      terminee: <?php echo (int)($statistiquesDemandesActivation['terminee'] ?? 0); ?>,
+      dernier_id: <?php echo isset($demandesActivation[0]) ? (int)($demandesActivation[0]['id_demande_activation'] ?? 0) : 0; ?>
+    };
+
+    var titreInitial = document.title;
+
+    function mettreAJourCompteurs(data) {
+      if (compteurTotal) { compteurTotal.textContent = String(data.total || 0); }
+      if (compteurAttente) { compteurAttente.textContent = String(data.en_attente || 0); }
+      if (compteurValidees) { compteurValidees.textContent = String(data.validee || 0); }
+      if (compteurRefusees) { compteurRefusees.textContent = String(data.refusee || 0); }
+      if (compteurTerminees) { compteurTerminees.textContent = String(data.terminee || 0); }
+    }
+
+    function afficherAlerte(message) {
+      if (!blocAlerte) {
+        return;
+      }
+      blocAlerte.textContent = message;
+      blocAlerte.style.display = 'block';
+    }
+
+    function notifierNavigateur(data) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+      }
+
+      var corps = 'Nouvelle demande d’activation';
+      if (data && data.dernier_id) {
+        corps += ' #' + data.dernier_id;
+      }
+
+      try {
+        new Notification('SR Licences', { body: corps });
+      } catch (e) {
+      }
+    }
+
+    function verifierChangement(data) {
+      mettreAJourCompteurs(data);
+
+      var changement = false;
+      if ((data.dernier_id || 0) > etatCourant.dernier_id) {
+        changement = true;
+      }
+      if ((data.en_attente || 0) !== etatCourant.en_attente) {
+        changement = true;
+      }
+      if ((data.total || 0) !== etatCourant.total) {
+        changement = true;
+      }
+
+      if (!changement) {
+        return;
+      }
+
+      etatCourant = {
+        total: data.total || 0,
+        en_attente: data.en_attente || 0,
+        validee: data.validee || 0,
+        refusee: data.refusee || 0,
+        terminee: data.terminee || 0,
+        dernier_id: data.dernier_id || 0
+      };
+
+      document.title = '(Nouveau) ' + titreInitial;
+      afficherAlerte('Nouvelle demande détectée. La page va se mettre à jour automatiquement…');
+      notifierNavigateur(data);
+
+      window.setTimeout(function () {
+        window.location.reload();
+      }, 1500);
+    }
+
+    function interroger() {
+      window.fetch(url, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      }).then(function (reponse) {
+        if (!reponse.ok) {
+          throw new Error('HTTP ' + reponse.status);
+        }
+        return reponse.json();
+      }).then(function (data) {
+        if (!data || data.ok !== true) {
+          return;
+        }
+        verifierChangement(data);
+      }).catch(function () {
+      });
+    }
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      window.setTimeout(function () {
+        try {
+          Notification.requestPermission();
+        } catch (e) {
+        }
+      }, 1500);
+    }
+
+    window.setInterval(interroger, 20000);
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        interroger();
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
         <?php
         exit;
     }
 
+
+    public function apiSurveillanceDemandesActivation(): void
+    {
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceDemandeActivation(
+                new DemandeActivationRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+
+            $statistiques = $service->obtenirStatistiquesTableauDeBord();
+            $demandes = $service->obtenirDemandesTableauDeBord(1);
+            $derniereDemande = $demandes[0] ?? [];
+
+            ReponseJson::envoyer([
+                'ok' => true,
+                'total' => (int)($statistiques['total'] ?? 0),
+                'en_attente' => (int)($statistiques['en_attente'] ?? 0),
+                'validee' => (int)($statistiques['validee'] ?? 0),
+                'refusee' => (int)($statistiques['refusee'] ?? 0),
+                'terminee' => (int)($statistiques['terminee'] ?? 0),
+                'dernier_id' => (int)($derniereDemande['id_demande_activation'] ?? 0),
+                'derniere_date_creation' => (string)($derniereDemande['date_creation'] ?? ''),
+                'derniere_date_maj' => (string)($derniereDemande['date_maj'] ?? ''),
+                'checked_at' => date('c'),
+            ]);
+        } catch (Throwable $e) {
+            ReponseJson::envoyer([
+                'ok' => false,
+                'message' => 'Surveillance des demandes d’activation indisponible.',
+                'detail' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
     public function gererReactivationLicences(): void
     {
@@ -1548,12 +1714,13 @@ final class ControleurAccueil
         <input type="hidden" name="action_decision" value="valider">
         <h2 style="margin-top:0;">Valider la demande et créer la licence</h2>
         <div class="grille-form">
-          <div class="champ"><label>Type de licence</label><select name="type_licence"><option value="perpetuelle">perpétuelle</option><option value="abonnement">abonnement</option></select></div>
+          <div class="champ"><label>Type de licence</label><select name="type_licence" id="sr_type_licence_decision"><option value="perpetuelle">perpétuelle</option><option value="abonnement">abonnement</option></select></div>
           <div class="champ"><label>Version max autorisée</label><input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*"></div>
-          <div class="champ"><label>Durée de validité</label><input type="number" min="1" step="1" name="validite_valeur" value="12"></div>
-          <div class="champ"><label>Unité de validité</label><select name="validite_unite"><option value="jours">jours</option><option value="semaines">semaines</option><option value="mois" selected>mois</option><option value="annees">années</option></select></div>
-          <div class="champ"><label>Durée de grâce</label><input type="number" min="0" step="1" name="grace_valeur" value="7"></div>
-          <div class="champ"><label>Unité de grâce</label><select name="grace_unite"><option value="jours" selected>jours</option><option value="semaines">semaines</option><option value="mois">mois</option><option value="annees">années</option></select></div>
+          <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de validité</label><input type="number" min="1" step="1" name="validite_valeur" value="12"></div>
+          <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Unité de validité</label><select name="validite_unite"><option value="jours">jours</option><option value="semaines">semaines</option><option value="mois" selected>mois</option><option value="annees">années</option></select></div>
+          <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de grâce</label><input type="number" min="0" step="1" name="grace_valeur" value="7"></div>
+          <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Unité de grâce</label><select name="grace_unite"><option value="jours" selected>jours</option><option value="semaines">semaines</option><option value="mois">mois</option><option value="annees">années</option></select></div>
+          <div class="champ sr-champ-abonnement" data-sr-abonnement="1" style="grid-column:1/-1;"><p class="muted" style="margin:0;">Ces champs ne sont utiles que pour une licence abonnement.</p></div>
           <div class="champ" style="grid-column:1/-1;"><label>Note interne de validation</label><textarea name="note_interne" placeholder="Note interne facultative"></textarea></div>
         </div>
         <div class="actions-form"><button type="submit">Valider la demande et créer la licence</button></div>
@@ -1577,6 +1744,36 @@ final class ControleurAccueil
       <a class="bouton-retour" href="/">Retour à la liste</a>
     </div>
   </div>
+
+  <script>
+  (function () {
+    var selectType = document.getElementById('sr_type_licence_decision');
+    if (!selectType) {
+      return;
+    }
+
+    var blocsAbonnement = Array.prototype.slice.call(document.querySelectorAll('[data-sr-abonnement="1"]'));
+    if (!blocsAbonnement.length) {
+      return;
+    }
+
+    function mettreAJourVisibiliteAbonnement() {
+      var estAbonnement = selectType.value === 'abonnement';
+
+      blocsAbonnement.forEach(function (bloc) {
+        bloc.style.display = estAbonnement ? '' : 'none';
+
+        var champs = bloc.querySelectorAll('input, select, textarea');
+        champs.forEach(function (champ) {
+          champ.disabled = !estAbonnement;
+        });
+      });
+    }
+
+    selectType.addEventListener('change', mettreAJourVisibiliteAbonnement);
+    mettreAJourVisibiliteAbonnement();
+  })();
+  </script>
 </body>
 </html>
         <?php
@@ -2165,15 +2362,18 @@ final class ControleurAccueil
             );
 
             if ($actionDecision === 'valider') {
+                $typeLicence = (string)($_POST['type_licence'] ?? 'perpetuelle');
+                $estAbonnement = ($typeLicence === 'abonnement');
+
                 $resultat = $service->validerDemandeActivation($idDemandeActivation, [
-                    'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
+                    'type_licence' => $typeLicence,
                     'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
-                    'validite_valeur' => (string)($_POST['validite_valeur'] ?? ''),
-                    'validite_unite' => (string)($_POST['validite_unite'] ?? 'mois'),
-                    'grace_valeur' => (string)($_POST['grace_valeur'] ?? ''),
-                    'grace_unite' => (string)($_POST['grace_unite'] ?? 'jours'),
-                    'date_expiration' => (string)($_POST['date_expiration'] ?? ''),
-                    'grace_jusqu_a' => (string)($_POST['grace_jusqu_a'] ?? ''),
+                    'validite_valeur' => $estAbonnement ? (string)($_POST['validite_valeur'] ?? '') : '',
+                    'validite_unite' => $estAbonnement ? (string)($_POST['validite_unite'] ?? 'mois') : 'mois',
+                    'grace_valeur' => $estAbonnement ? (string)($_POST['grace_valeur'] ?? '') : '',
+                    'grace_unite' => $estAbonnement ? (string)($_POST['grace_unite'] ?? 'jours') : 'jours',
+                    'date_expiration' => $estAbonnement ? (string)($_POST['date_expiration'] ?? '') : '',
+                    'grace_jusqu_a' => $estAbonnement ? (string)($_POST['grace_jusqu_a'] ?? '') : '',
                     'note_interne' => (string)($_POST['note_interne'] ?? ''),
                 ]);
 
