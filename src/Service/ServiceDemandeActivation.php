@@ -91,6 +91,7 @@ final class ServiceDemandeActivation
 
         return [
             'ok' => true,
+            'code' => 'activation_request_registered',
             'message' => 'Demande d’activation enregistrée.',
             'id_demande_activation' => $idDemandeActivation,
             'secret_suivi' => $secretSuivi,

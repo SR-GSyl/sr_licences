@@ -384,6 +384,7 @@ final class ServiceLicence
                 $message = 'Domaine absent dans la requête.';
             } else {
                 $message = 'Domaine non autorisé pour cette licence.';
+                $codeMessage = 'license_domain_not_authorized';
             }
         } elseif (!$this->versionModuleEstAutorisee($versionDemandee, $versionMaxAutorisee)) {
             $statutRetour = 'invalide';
@@ -423,6 +424,7 @@ final class ServiceLicence
             'next_check_at' => $prochaineVerification,
             'grace_until' => $graceUntilRetour,
             'max_version' => $versionMaxAutorisee,
+            'code' => ($codeMessage ?? ''),
             'message' => $message,
             'signature_method' => 'none',
             'signature' => '',
