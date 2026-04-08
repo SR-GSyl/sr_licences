@@ -382,6 +382,7 @@ final class ServiceLicence
             $statutRetour = 'invalide';
             if ($controleDomaineActif && $domaineDemande === '') {
                 $message = 'Domaine absent dans la requête.';
+                $codeMessage = 'license_domain_missing';
             } else {
                 $message = 'Domaine non autorisé pour cette licence.';
                 $codeMessage = 'license_domain_not_authorized';
@@ -390,8 +391,10 @@ final class ServiceLicence
             $statutRetour = 'invalide';
             if ($versionMaxAutorisee === '') {
                 $message = 'Version du module non transmise.';
+                    $codeMessage = 'license_version_missing';
             } elseif ($versionDemandee === '') {
                 $message = 'Version du module absente alors qu’une version max autorisée est définie.';
+                    $codeMessage = 'license_version_request_missing';
             } else {
                 $message = 'Version du module non autorisée. Version demandée : ' . $versionDemandee . '. Version max autorisée : ' . $versionMaxAutorisee . '.';
             }

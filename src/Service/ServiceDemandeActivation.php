@@ -123,7 +123,8 @@ final class ServiceDemandeActivation
         if ($statut === 'en_attente') {
             return [
                 'ok' => true,
-                'message' => 'Demande toujours en attente.',
+                'code' => 'activation_request_pending',
+            'message' => 'Demande toujours en attente.',
                 'id_demande_activation' => $idDemandeActivation,
                 'statut' => 'en_attente',
                 'checked_at' => date('c'),
@@ -133,7 +134,8 @@ final class ServiceDemandeActivation
         if ($statut === 'refusee') {
             return [
                 'ok' => true,
-                'message' => 'Demande refusée.',
+                'code' => 'activation_request_refused',
+            'message' => 'Demande refusée.',
                 'id_demande_activation' => $idDemandeActivation,
                 'statut' => 'refusee',
                 'checked_at' => date('c'),
@@ -156,6 +158,7 @@ final class ServiceDemandeActivation
 
         return [
             'ok' => true,
+            'code' => 'activation_available',
             'message' => 'Activation disponible.',
             'id_demande_activation' => $idDemandeActivation,
             'statut' => 'validee',
