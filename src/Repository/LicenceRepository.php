@@ -374,6 +374,45 @@ final class LicenceRepository
         return $resultat;
     }
 
+    public function trouverLicenceActiveParModuleEtDomainePrincipal(string $codeModule, string $domainePrincipal): ?array
+    {
+        $sql = '
+            SELECT
+                id_licence,
+                cle_licence,
+                code_module,
+                statut,
+                type_licence,
+                nom_client,
+                email_client,
+                domaine_principal,
+                version_max_autorisee,
+                date_creation,
+                date_activation,
+                date_expiration,
+                grace_jusqu_a,
+                date_maj,
+                commentaire_interne
+            FROM sr_licence
+            WHERE code_module = :code_module
+              AND domaine_principal = :domaine_principal
+              AND statut = :statut
+            ORDER BY id_licence DESC
+            LIMIT 1
+        ';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':code_module' => $codeModule,
+            ':domaine_principal' => $domainePrincipal,
+            ':statut' => 'active',
+        ]);
+
+        $ligne = $stmt->fetch();
+
+        return is_array($ligne) ? $ligne : null;
+    }
+
     private function normaliserNullable(mixed $valeur): ?string
     {
         $valeur = trim((string)$valeur);

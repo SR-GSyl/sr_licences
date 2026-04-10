@@ -71,7 +71,10 @@ final class ControleurApiLicence
 
             $donneesEntree = Requete::donneesEntree();
             $resultat = $service->demanderActivation($donneesEntree);
-            $this->envoyerNotificationNouvelleDemandeActivation($resultat, $donneesEntree);
+
+            if (!empty($resultat['ok'])) {
+                $this->envoyerNotificationNouvelleDemandeActivation($resultat, $donneesEntree);
+            }
 
             ReponseJson::envoyer($resultat, 200);
         } catch (InvalidArgumentException $e) {

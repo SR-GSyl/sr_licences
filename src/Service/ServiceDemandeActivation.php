@@ -74,6 +74,22 @@ final class ServiceDemandeActivation
             fn(string $domaine): bool => $domaine !== $domainePrincipal
         ));
 
+        $licenceActiveExistante = $this->licenceRepository->trouverLicenceActiveParModuleEtDomainePrincipal(
+            $codeModule,
+            $domainePrincipal
+        );
+
+        if ($licenceActiveExistante !== null) {
+            return [
+                'ok' => false,
+                'code' => 'license_already_active',
+                'message' => 'Une licence est déjà active pour ce domaine principal.',
+                'statut' => 'active',
+                'id_licence' => (int)($licenceActiveExistante['id_licence'] ?? 0),
+                'checked_at' => date('c'),
+            ];
+        }
+
         $secretSuivi = bin2hex(random_bytes(32));
 
         $idDemandeActivation = $this->demandeActivationRepository->insererDemandeActivation([
