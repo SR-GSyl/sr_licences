@@ -56,6 +56,8 @@ rsync -avm \
   --exclude='preparer_deploiement.sh' \
   --exclude='preparer_commit_et_deploiement.sh' \
   --exclude='readme.txt' \
+  --exclude='propager_vers_dev.sh' \
+  --exclude='preparer_zip.sh' \
   "$DOSSIER_DEPOT"/ \
   "$DOSSIER_DEPLOIEMENT"/
 
