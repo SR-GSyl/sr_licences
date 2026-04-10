@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # ./preparer_commit_et_deploiement.sh
+
+# travaille depuis /home/sylvere/Git_depot_local/sr_licences
+# fait git add -A
+# fait le commit si nécessaire
+# prépare un dossier de déploiement dans
+# C:\Users\soulr\Downloads\sr_licences_deploiement
+
 set -euo pipefail
 
 DOSSIER_DEPOT="/home/sylvere/Git_depot_local/sr_licences"

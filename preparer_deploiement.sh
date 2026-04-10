@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # ./preparer_deploiement.sh
+
+# ne fait pas de commit
+# prépare un dossier de déploiement dans
+# C:\Users\soulr\Downloads\sr_licences_deploiement_prod
+
 set -euo pipefail
 
 DOSSIER_SOURCE_DEV="/home/sylvere/Git_depot_local/sr_licences"
