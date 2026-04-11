@@ -42,6 +42,8 @@ $routesPubliques = [
     '/api/licence/check',
     '/api/licence/demander-activation',
     '/api/licence/verifier-activation',
+    '/api/licence/demander-domaines-test',
+    '/api/licence/verifier-domaines-test',
 ];
 
 $routeEstPublique = in_array($chemin, $routesPubliques, true);
@@ -163,6 +165,14 @@ switch ($chemin) {
 
     case '/api/licence/verifier-activation':
         (new ControleurApiLicence($config))->verifierActivation();
+        break;
+
+    case '/api/licence/demander-domaines-test':
+        (new ControleurApiLicence($config))->demanderDomainesTest();
+        break;
+
+    case '/api/licence/verifier-domaines-test':
+        (new ControleurApiLicence($config))->verifierDomainesTest();
         break;
 
     case '/api/demandes-activation/surveillance':
