@@ -143,6 +143,14 @@ switch ($chemin) {
         (new ControleurAccueil($config))->afficherDemandeActivation();
         break;
 
+    case '/demandes-domaines-test/voir':
+        (new ControleurAccueil($config))->afficherDemandeDomainesTest();
+        break;
+
+    case '/demandes-domaines-test/decision':
+        (new ControleurAccueil($config))->traiterDecisionDemandeDomainesTest();
+        break;
+
     case '/demandes-activation/decision':
         (new ControleurAccueil($config))->traiterDecisionDemandeActivation();
         break;

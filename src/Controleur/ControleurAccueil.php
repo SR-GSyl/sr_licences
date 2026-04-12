@@ -6,8 +6,10 @@ namespace SrLicences\Controleur;
 use SrLicences\Config\BaseDeDonnees;
 use SrLicences\Http\ReponseJson;
 use SrLicences\Repository\DemandeActivationRepository;
+use SrLicences\Repository\DemandeDomainesTestRepository;
 use SrLicences\Repository\LicenceRepository;
 use SrLicences\Service\ServiceDemandeActivation;
+use SrLicences\Service\ServiceDemandeDomainesTest;
 use SrLicences\Service\ServiceLicence;
 use Throwable;
 
@@ -49,9 +51,18 @@ final class ControleurAccueil
             'terminee' => 0,
         ];
         $demandesActivation = [];
+        $statistiquesDemandesDomainesTest = [
+            'total' => 0,
+            'en_attente' => 0,
+            'validee' => 0,
+            'refusee' => 0,
+            'terminee' => 0,
+        ];
+        $demandesDomainesTest = [];
         $messageStatistiques = 'Compteurs non disponibles tant que la BDD n’est pas configurée.';
         $messageListe = 'Liste non disponible tant que la BDD n’est pas configurée.';
         $messageDemandesActivation = 'Demandes d’activation non disponibles tant que la BDD n’est pas configurée.';
+        $messageDemandesDomainesTest = 'Demandes de domaines de test non disponibles tant que la BDD n’est pas configurée.';
 
         if (!empty($etatBdd['ok'])) {
             try {
@@ -75,10 +86,23 @@ final class ControleurAccueil
                 } catch (Throwable $e) {
                     $messageDemandesActivation = $e->getMessage();
                 }
+
+                try {
+                    $serviceDemandesDomainesTest = new ServiceDemandeDomainesTest(
+                        new DemandeDomainesTestRepository($pdo),
+                        new LicenceRepository($pdo)
+                    );
+                    $statistiquesDemandesDomainesTest = $serviceDemandesDomainesTest->obtenirStatistiquesTableauDeBord();
+                    $demandesDomainesTest = $serviceDemandesDomainesTest->obtenirDemandesTableauDeBord(100);
+                    $messageDemandesDomainesTest = 'Lecture des demandes de domaines de test OK.';
+                } catch (Throwable $e) {
+                    $messageDemandesDomainesTest = $e->getMessage();
+                }
             } catch (Throwable $e) {
                 $messageStatistiques = $e->getMessage();
                 $messageListe = $e->getMessage();
                 $messageDemandesActivation = $e->getMessage();
+                $messageDemandesDomainesTest = $e->getMessage();
             }
         }
 
@@ -559,6 +583,91 @@ final class ControleurAccueil
                   </td>
                   <td class="cellule-date" data-colonne="date_creation"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td data-colonne="note_interne"><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+    </div>
+
+
+    <div class="bloc-liste">
+      <h2>Demandes de domaines de test</h2>
+      <p class="muted"><?php echo htmlspecialchars($messageDemandesDomainesTest, ENT_QUOTES, 'UTF-8'); ?></p>
+
+      <div class="grille">
+        <div class="carte">
+          <h3 class="titre">Total demandes</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['total'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">En attente</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['en_attente'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Validées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['validee'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Refusées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['refusee'] ?? 0); ?></div>
+        </div>
+        <div class="carte">
+          <h3 class="titre">Terminées</h3>
+          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['terminee'] ?? 0); ?></div>
+        </div>
+      </div>
+
+      <?php if (empty($demandesDomainesTest)): ?>
+        <p class="muted">Aucune demande de domaines de test enregistrée pour le moment.</p>
+      <?php else: ?>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Voir</th>
+                <th>ID</th>
+                <th>Statut</th>
+                <th>Licence liée</th>
+                <th>Clé licence</th>
+                <th>Module</th>
+                <th>Domaine principal</th>
+                <th>Domaines test actuels</th>
+                <th>Domaines test demandés</th>
+                <th>Motif</th>
+                <th>Date création</th>
+                <th>Note interne</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($demandesDomainesTest as $demandeDomainesTest): ?>
+                <?php $statutDemandeDomainesTest = (string)($demandeDomainesTest['statut'] ?? ''); ?>
+                <tr>
+                  <td>
+                    <a class="btn-voir" href="/demandes-domaines-test/voir?id=<?php echo (int)($demandeDomainesTest['id_demande_domaines_test'] ?? 0); ?>">Voir</a>
+                  </td>
+                  <td><?php echo (int)($demandeDomainesTest['id_demande_domaines_test'] ?? 0); ?></td>
+                  <td>
+                    <span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemandeDomainesTest), ENT_QUOTES, 'UTF-8'); ?>">
+                      <?php echo htmlspecialchars($statutDemandeDomainesTest !== '' ? $statutDemandeDomainesTest : '—', ENT_QUOTES, 'UTF-8'); ?>
+                    </span>
+                  </td>
+                  <td>
+                    <?php if ((int)($demandeDomainesTest['id_licence'] ?? 0) > 0): ?>
+                      <a class="btn-voir" href="/licences/voir?id=<?php echo (int)($demandeDomainesTest['id_licence'] ?? 0); ?>">Licence #<?php echo (int)($demandeDomainesTest['id_licence'] ?? 0); ?></a>
+                    <?php else: ?>
+                      —
+                    <?php endif; ?>
+                  </td>
+                  <td><code><?php echo htmlspecialchars((string)($demandeDomainesTest['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td><code><?php echo htmlspecialchars((string)($demandeDomainesTest['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></td>
+                  <td><?php echo htmlspecialchars((string)($demandeDomainesTest['domaine_principal'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($demandeDomainesTest['domaines_test_actuels'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($demandeDomainesTest['domaines_test_demandes'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($demandeDomainesTest['motif'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
+                  <td><?php echo htmlspecialchars($this->formaterDate((string)($demandeDomainesTest['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo nl2br(htmlspecialchars((string)($demandeDomainesTest['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -1621,6 +1730,130 @@ final class ControleurAccueil
     }
 
 
+    public function afficherDemandeDomainesTest(): void
+    {
+        $idDemandeDomainesTest = (int)($_GET['id'] ?? 0);
+
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $serviceDemandesDomainesTest = new ServiceDemandeDomainesTest(
+                new DemandeDomainesTestRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+            $demande = $serviceDemandesDomainesTest->obtenirDemandePourAdmin($idDemandeDomainesTest);
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Chargement impossible : ' . $e->getMessage();
+            header('Location: /');
+            exit;
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Demande domaines de test #<?php echo (int)($demande['id_demande_domaines_test'] ?? 0); ?> - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f8fafc;color:#111827}
+    .page{max-width:1180px;margin:32px auto;background:#fff;border:1px solid #dbe3ea;border-radius:16px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.06)}
+    .barre{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .badge-statut{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid;font-weight:700;font-size:12px;line-height:1.2;white-space:nowrap}
+    .statut-active{background:#dcfce7;color:#166534;border-color:#86efac}
+    .statut-suspendue{background:#fff7ed;color:#9a3412;border-color:#fdba74}
+    .statut-revoquee{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .statut-expiree{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+    .statut-invalide{background:#e5e7eb;color:#374151;border-color:#cbd5e1}
+    .muted{color:#4b5563}
+    .grille-fiche{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:20px}
+    .carte-fiche{border:1px solid #dbe3ea;border-radius:14px;padding:16px;background:#fff}
+    .libelle{margin:0 0 8px 0;font-size:13px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:.02em}
+    .contenu{font-size:16px;line-height:1.45;word-break:break-word}
+    .contenu code{background:#f1f5f9;border:1px solid #cbd5e1;padding:2px 6px;border-radius:6px}
+    .contenu.commentaire{white-space:pre-wrap}
+    .bloc-actions{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap}
+    a.bouton-retour{display:inline-block;padding:10px 14px;border-radius:10px;background:#111827;color:#fff;text-decoration:none;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="barre">
+      <div>
+        <h1 style="margin:0 0 8px 0;">Demande domaines de test #<?php echo (int)($demande['id_demande_domaines_test'] ?? 0); ?></h1>
+        <p class="muted" style="margin:0;">Consultation détaillée d’une demande de mise à jour des domaines de test.</p>
+      </div>
+      <div>
+        <a class="bouton-retour" href="/">Retour à la liste</a>
+      </div>
+    </div>
+
+    <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
+
+    <div class="grille-fiche">
+      <div class="carte-fiche"><div class="libelle">ID</div><div class="contenu"><?php echo (int)($demande['id_demande_domaines_test'] ?? 0); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Statut</div><div class="contenu"><span class="badge-statut <?php echo htmlspecialchars($this->obtenirClasseStatutDemandeActivation($statutDemande), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($statutDemande !== '' ? $statutDemande : '—', ENT_QUOTES, 'UTF-8'); ?></span></div></div>
+      <div class="carte-fiche"><div class="libelle">Licence liée</div><div class="contenu"><?php if ((int)($demande['id_licence'] ?? 0) > 0): ?><a class="bouton-retour" href="/licences/voir?id=<?php echo (int)($demande['id_licence'] ?? 0); ?>">Voir la licence #<?php echo (int)($demande['id_licence'] ?? 0); ?></a><?php else: ?>—<?php endif; ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Clé licence</div><div class="contenu"><code><?php echo htmlspecialchars((string)($demande['cle_licence'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div></div>
+      <div class="carte-fiche"><div class="libelle">Module</div><div class="contenu"><code><?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></code></div></div>
+      <div class="carte-fiche"><div class="libelle">Domaine principal</div><div class="contenu"><?php echo htmlspecialchars((string)($demande['domaine_principal'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Domaines de test actuels</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test_actuels'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Domaines de test demandés</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['domaines_test_demandes'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Motif</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['motif'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date création</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_creation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date validation</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_validation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date refus</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_refus'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Date consommation</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_consommation'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche"><div class="libelle">Dernière mise à jour</div><div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($demande['date_maj'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div></div>
+      <div class="carte-fiche" style="grid-column:1/-1;"><div class="libelle">Note interne</div><div class="contenu commentaire"><?php echo nl2br(htmlspecialchars((string)($demande['note_interne'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></div></div>
+    </div>
+
+    <?php if (in_array($statutDemande, ['en_attente', 'refusee'], true)): ?>
+      <form method="post" action="/demandes-domaines-test/decision" class="formulaire">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="id_demande_domaines_test" value="<?php echo (int)($demande['id_demande_domaines_test'] ?? 0); ?>">
+        <input type="hidden" name="action_decision" value="valider">
+        <h2 style="margin-top:24px;">Valider la demande et appliquer les domaines de test</h2>
+        <div class="grille-form">
+          <div class="champ" style="grid-column:1/-1;">
+            <label>Note interne de validation</label>
+            <textarea name="note_interne" placeholder="Note interne facultative"></textarea>
+          </div>
+        </div>
+        <div class="actions-form">
+          <button type="submit">Valider la demande et appliquer les domaines de test</button>
+        </div>
+      </form>
+    <?php endif; ?>
+
+    <?php if (in_array($statutDemande, ['en_attente', 'validee'], true)): ?>
+      <form method="post" action="/demandes-domaines-test/decision" class="formulaire">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars((string)$_SESSION['sr_licences_csrf'], ENT_QUOTES, 'UTF-8'); ?>">
+        <input type="hidden" name="id_demande_domaines_test" value="<?php echo (int)($demande['id_demande_domaines_test'] ?? 0); ?>">
+        <input type="hidden" name="action_decision" value="refuser">
+        <h2 style="margin-top:24px;">Refuser la demande</h2>
+        <div class="grille-form">
+          <div class="champ" style="grid-column:1/-1;">
+            <label>Motif / note interne de refus</label>
+            <textarea name="note_interne" placeholder="Motif facultatif"></textarea>
+          </div>
+        </div>
+        <div class="actions-form">
+          <button type="submit">Refuser la demande</button>
+        </div>
+      </form>
+    <?php endif; ?>
+
+    <div class="bloc-actions">
+      <a class="bouton-retour" href="/">Retour à la liste</a>
+    </div>
+  </div>
+</body>
+</html>
+        <?php
+        exit;
+    }
+
     public function afficherDemandeActivation(): void
     {
         $idDemandeActivation = (int)($_GET['id'] ?? 0);
@@ -2396,6 +2629,63 @@ final class ControleurAccueil
         }
 
         header('Location: /');
+        exit;
+    }
+
+    public function traiterDecisionDemandeDomainesTest(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo '405 - Méthode non autorisée';
+            exit;
+        }
+
+        $csrfSession = (string)($_SESSION['sr_licences_csrf'] ?? '');
+        $csrfFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+        if ($csrfSession === '' || !hash_equals($csrfSession, $csrfFormulaire)) {
+            $_SESSION['sr_licences_message_erreur'] = 'Jeton de sécurité invalide.';
+            header('Location: /');
+            exit;
+        }
+
+        $idDemandeDomainesTest = (int)($_POST['id_demande_domaines_test'] ?? 0);
+
+        try {
+            $actionDecision = trim((string)($_POST['action_decision'] ?? ''));
+
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceDemandeDomainesTest(
+                new DemandeDomainesTestRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+
+            if ($actionDecision === 'valider') {
+                $resultat = $service->validerDemandeDomainesTest(
+                    $idDemandeDomainesTest,
+                    (string)($_POST['note_interne'] ?? '')
+                );
+
+                $_SESSION['sr_licences_message_succes'] =
+                    'Demande de domaines de test #' . (int)($resultat['id_demande_domaines_test'] ?? 0) .
+                    ' validée. Domaines appliqués à la licence #' . (int)($resultat['id_licence'] ?? 0) . '.';
+            } elseif ($actionDecision === 'refuser') {
+                $resultat = $service->refuserDemandeDomainesTest(
+                    $idDemandeDomainesTest,
+                    (string)($_POST['note_interne'] ?? '')
+                );
+
+                $_SESSION['sr_licences_message_succes'] =
+                    'Demande de domaines de test #' . (int)($resultat['id_demande_domaines_test'] ?? 0) . ' refusée.';
+            } else {
+                throw new \InvalidArgumentException('Action de décision invalide.');
+            }
+        } catch (Throwable $e) {
+            $_SESSION['sr_licences_message_erreur'] = 'Décision impossible : ' . $e->getMessage();
+        }
+
+        header('Location: /demandes-domaines-test/voir?id=' . $idDemandeDomainesTest);
         exit;
     }
 
