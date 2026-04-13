@@ -599,31 +599,33 @@ final class ControleurAccueil
       <div class="grille">
         <div class="carte">
           <h3 class="titre">Total demandes</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['total'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-domaines-test-total"><?php echo (int)($statistiquesDemandesDomainesTest['total'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">En attente</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['en_attente'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-domaines-test-en-attente"><?php echo (int)($statistiquesDemandesDomainesTest['en_attente'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Validées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['validee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-domaines-test-validees"><?php echo (int)($statistiquesDemandesDomainesTest['validee'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Refusées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['refusee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-domaines-test-refusees"><?php echo (int)($statistiquesDemandesDomainesTest['refusee'] ?? 0); ?></div>
         </div>
         <div class="carte">
           <h3 class="titre">Terminées</h3>
-          <div class="valeur-mini"><?php echo (int)($statistiquesDemandesDomainesTest['terminee'] ?? 0); ?></div>
+          <div class="valeur-mini" id="sr-demandes-domaines-test-terminees"><?php echo (int)($statistiquesDemandesDomainesTest['terminee'] ?? 0); ?></div>
         </div>
       </div>
+
+      <div id="sr-licences-alerte-demandes-domaines-test" class="alerte-ok" style="display:none;"></div>
 
       <?php if (empty($demandesDomainesTest)): ?>
         <p class="muted">Aucune demande de domaines de test enregistrée pour le moment.</p>
       <?php else: ?>
         <div class="table-wrap">
-          <table>
+          <table id="tableau-demandes-domaines-test">
             <thead>
               <tr>
                 <th>Voir</th>
@@ -1473,6 +1475,111 @@ final class ControleurAccueil
     });
   })();
   </script>
+
+  <script>
+  (function () {
+    var url = '/api/demandes-domaines-test/surveillance';
+    var blocAlerte = document.getElementById('sr-licences-alerte-demandes-domaines-test');
+    var compteurTotal = document.getElementById('sr-demandes-domaines-test-total');
+    var compteurAttente = document.getElementById('sr-demandes-domaines-test-en-attente');
+    var compteurValidees = document.getElementById('sr-demandes-domaines-test-validees');
+    var compteurRefusees = document.getElementById('sr-demandes-domaines-test-refusees');
+    var compteurTerminees = document.getElementById('sr-demandes-domaines-test-terminees');
+    var tableau = document.getElementById('tableau-demandes-domaines-test');
+
+    if (!tableau) {
+      return;
+    }
+
+    var etatCourant = {
+      total: <?php echo (int)($statistiquesDemandesDomainesTest['total'] ?? 0); ?>,
+      en_attente: <?php echo (int)($statistiquesDemandesDomainesTest['en_attente'] ?? 0); ?>,
+      validee: <?php echo (int)($statistiquesDemandesDomainesTest['validee'] ?? 0); ?>,
+      refusee: <?php echo (int)($statistiquesDemandesDomainesTest['refusee'] ?? 0); ?>,
+      terminee: <?php echo (int)($statistiquesDemandesDomainesTest['terminee'] ?? 0); ?>,
+      dernier_id: <?php echo isset($demandesDomainesTest[0]) ? (int)($demandesDomainesTest[0]['id_demande_domaines_test'] ?? 0) : 0; ?>
+    };
+
+    function mettreAJourCompteurs(data) {
+      if (compteurTotal) { compteurTotal.textContent = String(data.total || 0); }
+      if (compteurAttente) { compteurAttente.textContent = String(data.en_attente || 0); }
+      if (compteurValidees) { compteurValidees.textContent = String(data.validee || 0); }
+      if (compteurRefusees) { compteurRefusees.textContent = String(data.refusee || 0); }
+      if (compteurTerminees) { compteurTerminees.textContent = String(data.terminee || 0); }
+    }
+
+    function afficherAlerte(message) {
+      if (!blocAlerte) {
+        return;
+      }
+      blocAlerte.textContent = message;
+      blocAlerte.style.display = 'block';
+    }
+
+    function verifierChangement(data) {
+      mettreAJourCompteurs(data);
+
+      var changement = false;
+      if ((data.dernier_id || 0) > etatCourant.dernier_id) {
+        changement = true;
+      }
+      if ((data.en_attente || 0) !== etatCourant.en_attente) {
+        changement = true;
+      }
+      if ((data.total || 0) !== etatCourant.total) {
+        changement = true;
+      }
+
+      if (!changement) {
+        return;
+      }
+
+      etatCourant = {
+        total: data.total || 0,
+        en_attente: data.en_attente || 0,
+        validee: data.validee || 0,
+        refusee: data.refusee || 0,
+        terminee: data.terminee || 0,
+        dernier_id: data.dernier_id || 0
+      };
+
+      afficherAlerte('Nouvelle mise à jour détectée pour les demandes de domaines de test. La page va se mettre à jour automatiquement…');
+
+      window.setTimeout(function () {
+        window.location.reload();
+      }, 1500);
+    }
+
+    function interroger() {
+      window.fetch(url, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      }).then(function (reponse) {
+        if (!reponse.ok) {
+          throw new Error('HTTP ' + reponse.status);
+        }
+        return reponse.json();
+      }).then(function (data) {
+        if (!data || data.ok !== true) {
+          return;
+        }
+        verifierChangement(data);
+      }).catch(function () {
+      });
+    }
+
+    window.setInterval(interroger, 20000);
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        interroger();
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
         <?php
@@ -1509,6 +1616,40 @@ final class ControleurAccueil
             ReponseJson::envoyer([
                 'ok' => false,
                 'message' => 'Surveillance des demandes d’activation indisponible.',
+                'detail' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function apiSurveillanceDemandesDomainesTest(): void
+    {
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $service = new ServiceDemandeDomainesTest(
+                new DemandeDomainesTestRepository($pdo),
+                new LicenceRepository($pdo)
+            );
+
+            $statistiques = $service->obtenirStatistiquesTableauDeBord();
+            $demandes = $service->obtenirDemandesTableauDeBord(1);
+            $derniereDemande = $demandes[0] ?? [];
+
+            ReponseJson::envoyer([
+                'ok' => true,
+                'total' => (int)($statistiques['total'] ?? 0),
+                'en_attente' => (int)($statistiques['en_attente'] ?? 0),
+                'validee' => (int)($statistiques['validee'] ?? 0),
+                'refusee' => (int)($statistiques['refusee'] ?? 0),
+                'terminee' => (int)($statistiques['terminee'] ?? 0),
+                'dernier_id' => (int)($derniereDemande['id_demande_domaines_test'] ?? 0),
+                'derniere_date_creation' => (string)($derniereDemande['date_creation'] ?? ''),
+                'derniere_date_maj' => (string)($derniereDemande['date_maj'] ?? ''),
+                'checked_at' => date('c'),
+            ]);
+        } catch (Throwable $e) {
+            ReponseJson::envoyer([
+                'ok' => false,
+                'message' => 'Surveillance des demandes de domaines de test indisponible.',
                 'detail' => $e->getMessage(),
             ], 500);
         }
