@@ -192,6 +192,8 @@ final class ControleurAccueil
     .btn-secondaire{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#111827;font-weight:700;cursor:pointer}
     .resume-filtres{margin:0 0 10px 0;color:#4b5563;font-size:13px}
     .ligne-masquee{display:none}
+    .ligne-masquee-filtre-demandes{display:none}
+    .ligne-masquee-filtre-demandes-domaines-test{display:none}
     .entete-accordeon{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .bouton-accordeon{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#111827;font-weight:700;cursor:pointer}
     .contenu-accordeon{display:none;margin-top:14px}
@@ -491,6 +493,35 @@ final class ControleurAccueil
         </div>
       </div>
 
+      <div class="barre-filtres-liste" id="barre-filtres-demandes-activation">
+        <div class="champ-filtre">
+          <label for="filtre_demande_activation_recherche">Recherche libre</label>
+          <input type="text" id="filtre_demande_activation_recherche" placeholder="ID, module, client, e-mail, commande...">
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_activation_statut">Statut</label>
+          <select id="filtre_demande_activation_statut">
+            <option value="">Tous</option>
+            <option value="en_attente">en_attente</option>
+            <option value="validee">validee</option>
+            <option value="refusee">refusee</option>
+            <option value="terminee">terminee</option>
+          </select>
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_activation_module">Module</label>
+          <input type="text" id="filtre_demande_activation_module" placeholder="sr_merchant_flux">
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_activation_domaine">Domaine</label>
+          <input type="text" id="filtre_demande_activation_domaine" placeholder="exemple.com">
+        </div>
+        <div class="actions-filtres">
+          <button type="button" class="btn-secondaire" id="btn_reinit_filtres_demandes_activation">Réinitialiser</button>
+        </div>
+      </div>
+      <p class="resume-filtres" id="resume_filtres_demandes_activation"></p>
+
       <?php if (empty($demandesActivation)): ?>
         <p class="muted">Aucune demande d’activation enregistrée pour le moment.</p>
       <?php else: ?>
@@ -557,7 +588,22 @@ final class ControleurAccueil
                 <?php $statutDemande = (string)($demande['statut'] ?? ''); ?>
                 <tr
                   class="ligne-demande-activation"
-                  data-filtre-statut="<?php echo htmlspecialchars($statutDemande, ENT_QUOTES, 'UTF-8'); ?>">
+                  data-filtre-global="<?php echo htmlspecialchars(implode(' ', [
+                      (string)($demande['id_demande_activation'] ?? ''),
+                      (string)($demande['statut'] ?? ''),
+                      (string)($demande['code_module'] ?? ''),
+                      (string)($demande['version_module'] ?? ''),
+                      (string)($demande['nom_client'] ?? ''),
+                      (string)($demande['email_client'] ?? ''),
+                      (string)($demande['numero_commande'] ?? ''),
+                      (string)($demande['domaine_principal'] ?? ''),
+                      (string)($demande['domaines_test'] ?? ''),
+                      (string)($demande['id_licence'] ?? ''),
+                      (string)($demande['note_interne'] ?? '')
+                  ]), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-statut="<?php echo htmlspecialchars($statutDemande, ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-module="<?php echo htmlspecialchars((string)($demande['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-domaine="<?php echo htmlspecialchars(trim((string)($demande['domaine_principal'] ?? '') . ' ' . (string)($demande['domaines_test'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>">
                   <td class="colonne-selection" data-colonne="voir">
                     <a class="btn-voir" href="/demandes-activation/voir?id=<?php echo (int)($demande['id_demande_activation'] ?? 0); ?>">Voir</a>
                   </td>
@@ -621,6 +667,35 @@ final class ControleurAccueil
 
       <div id="sr-licences-alerte-demandes-domaines-test" class="alerte-ok" style="display:none;"></div>
 
+      <div class="barre-filtres-liste" id="barre-filtres-demandes-domaines-test">
+        <div class="champ-filtre">
+          <label for="filtre_demande_domaines_test_recherche">Recherche libre</label>
+          <input type="text" id="filtre_demande_domaines_test_recherche" placeholder="ID, clé, module, domaine, motif...">
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_domaines_test_statut">Statut</label>
+          <select id="filtre_demande_domaines_test_statut">
+            <option value="">Tous</option>
+            <option value="en_attente">en_attente</option>
+            <option value="validee">validee</option>
+            <option value="refusee">refusee</option>
+            <option value="terminee">terminee</option>
+          </select>
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_domaines_test_module">Module</label>
+          <input type="text" id="filtre_demande_domaines_test_module" placeholder="sr_merchant_flux">
+        </div>
+        <div class="champ-filtre">
+          <label for="filtre_demande_domaines_test_domaine">Domaine</label>
+          <input type="text" id="filtre_demande_domaines_test_domaine" placeholder="exemple.com">
+        </div>
+        <div class="actions-filtres">
+          <button type="button" class="btn-secondaire" id="btn_reinit_filtres_demandes_domaines_test">Réinitialiser</button>
+        </div>
+      </div>
+      <p class="resume-filtres" id="resume_filtres_demandes_domaines_test"></p>
+
       <?php if (empty($demandesDomainesTest)): ?>
         <p class="muted">Aucune demande de domaines de test enregistrée pour le moment.</p>
       <?php else: ?>
@@ -645,7 +720,23 @@ final class ControleurAccueil
             <tbody>
               <?php foreach ($demandesDomainesTest as $demandeDomainesTest): ?>
                 <?php $statutDemandeDomainesTest = (string)($demandeDomainesTest['statut'] ?? ''); ?>
-                <tr>
+                <tr
+                  class="ligne-demande-domaines-test"
+                  data-filtre-global="<?php echo htmlspecialchars(implode(' ', [
+                      (string)($demandeDomainesTest['id_demande_domaines_test'] ?? ''),
+                      (string)($demandeDomainesTest['statut'] ?? ''),
+                      (string)($demandeDomainesTest['id_licence'] ?? ''),
+                      (string)($demandeDomainesTest['cle_licence'] ?? ''),
+                      (string)($demandeDomainesTest['code_module'] ?? ''),
+                      (string)($demandeDomainesTest['domaine_principal'] ?? ''),
+                      (string)($demandeDomainesTest['domaines_test_actuels'] ?? ''),
+                      (string)($demandeDomainesTest['domaines_test_demandes'] ?? ''),
+                      (string)($demandeDomainesTest['motif'] ?? ''),
+                      (string)($demandeDomainesTest['note_interne'] ?? '')
+                  ]), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-statut="<?php echo htmlspecialchars($statutDemandeDomainesTest, ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-module="<?php echo htmlspecialchars((string)($demandeDomainesTest['code_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-filtre-domaine="<?php echo htmlspecialchars(trim((string)($demandeDomainesTest['domaine_principal'] ?? '') . ' ' . (string)($demandeDomainesTest['domaines_test_actuels'] ?? '') . ' ' . (string)($demandeDomainesTest['domaines_test_demandes'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>">
                   <td>
                     <a class="btn-voir" href="/demandes-domaines-test/voir?id=<?php echo (int)($demandeDomainesTest['id_demande_domaines_test'] ?? 0); ?>">Voir</a>
                   </td>
@@ -1344,6 +1435,179 @@ final class ControleurAccueil
 
     appliquerVisibiliteColonnes();
     appliquerFiltresDemandes();
+  })();
+  </script>
+
+
+  <script>
+  (function () {
+    var champRecherche = document.getElementById('filtre_demande_activation_recherche');
+    var champStatut = document.getElementById('filtre_demande_activation_statut');
+    var champModule = document.getElementById('filtre_demande_activation_module');
+    var champDomaine = document.getElementById('filtre_demande_activation_domaine');
+    var boutonReset = document.getElementById('btn_reinit_filtres_demandes_activation');
+    var resume = document.getElementById('resume_filtres_demandes_activation');
+    var resumeBloc = document.getElementById('resume_demandes_activation');
+    var lignes = document.querySelectorAll('#tableau-demandes-activation tbody tr.ligne-demande-activation');
+    var caseRefusees = document.getElementById('afficher_demandes_refusees');
+    var caseTerminees = document.getElementById('afficher_demandes_terminees');
+
+    if (!champRecherche || !champStatut || !champModule || !champDomaine || !boutonReset || !resume || !lignes.length) {
+      return;
+    }
+
+    function normaliser(valeur) {
+      return (valeur || '').toString().toLowerCase().trim();
+    }
+
+    function mettreAJourResumes() {
+      var visibles = 0;
+
+      Array.prototype.forEach.call(lignes, function (ligne) {
+        if (!ligne.classList.contains('ligne-masquee') && !ligne.classList.contains('ligne-masquee-filtre-demandes')) {
+          visibles += 1;
+        }
+      });
+
+      var libelle = visibles + ' demande' + (visibles > 1 ? 's' : '') + ' affichée' + (visibles > 1 ? 's' : '') + '.';
+      resume.textContent = libelle;
+      if (resumeBloc) {
+        resumeBloc.textContent = libelle;
+      }
+    }
+
+    function appliquerFiltres() {
+      var recherche = normaliser(champRecherche.value);
+      var statut = normaliser(champStatut.value);
+      var module = normaliser(champModule.value);
+      var domaine = normaliser(champDomaine.value);
+
+      Array.prototype.forEach.call(lignes, function (ligne) {
+        var filtreGlobal = normaliser(ligne.getAttribute('data-filtre-global'));
+        var filtreStatut = normaliser(ligne.getAttribute('data-filtre-statut'));
+        var filtreModule = normaliser(ligne.getAttribute('data-filtre-module'));
+        var filtreDomaine = normaliser(ligne.getAttribute('data-filtre-domaine'));
+
+        var ok = true;
+
+        if (recherche && filtreGlobal.indexOf(recherche) === -1) {
+          ok = false;
+        }
+        if (ok && statut && filtreStatut !== statut) {
+          ok = false;
+        }
+        if (ok && module && filtreModule.indexOf(module) === -1) {
+          ok = false;
+        }
+        if (ok && domaine && filtreDomaine.indexOf(domaine) === -1) {
+          ok = false;
+        }
+
+        ligne.classList.toggle('ligne-masquee-filtre-demandes', !ok);
+      });
+
+      mettreAJourResumes();
+    }
+
+    [champRecherche, champStatut, champModule, champDomaine].forEach(function (champ) {
+      var evenement = champ.tagName === 'SELECT' ? 'change' : 'input';
+      champ.addEventListener(evenement, appliquerFiltres);
+    });
+
+    if (caseRefusees) {
+      caseRefusees.addEventListener('change', function () {
+        window.setTimeout(mettreAJourResumes, 0);
+      });
+    }
+
+    if (caseTerminees) {
+      caseTerminees.addEventListener('change', function () {
+        window.setTimeout(mettreAJourResumes, 0);
+      });
+    }
+
+    boutonReset.addEventListener('click', function () {
+      champRecherche.value = '';
+      champStatut.value = '';
+      champModule.value = '';
+      champDomaine.value = '';
+      appliquerFiltres();
+    });
+
+    appliquerFiltres();
+  })();
+  </script>
+
+  <script>
+  (function () {
+    var champRecherche = document.getElementById('filtre_demande_domaines_test_recherche');
+    var champStatut = document.getElementById('filtre_demande_domaines_test_statut');
+    var champModule = document.getElementById('filtre_demande_domaines_test_module');
+    var champDomaine = document.getElementById('filtre_demande_domaines_test_domaine');
+    var boutonReset = document.getElementById('btn_reinit_filtres_demandes_domaines_test');
+    var resume = document.getElementById('resume_filtres_demandes_domaines_test');
+    var lignes = document.querySelectorAll('#tableau-demandes-domaines-test tbody tr.ligne-demande-domaines-test');
+
+    if (!champRecherche || !champStatut || !champModule || !champDomaine || !boutonReset || !resume || !lignes.length) {
+      return;
+    }
+
+    function normaliser(valeur) {
+      return (valeur || '').toString().toLowerCase().trim();
+    }
+
+    function appliquerFiltres() {
+      var recherche = normaliser(champRecherche.value);
+      var statut = normaliser(champStatut.value);
+      var module = normaliser(champModule.value);
+      var domaine = normaliser(champDomaine.value);
+      var visibles = 0;
+
+      Array.prototype.forEach.call(lignes, function (ligne) {
+        var filtreGlobal = normaliser(ligne.getAttribute('data-filtre-global'));
+        var filtreStatut = normaliser(ligne.getAttribute('data-filtre-statut'));
+        var filtreModule = normaliser(ligne.getAttribute('data-filtre-module'));
+        var filtreDomaine = normaliser(ligne.getAttribute('data-filtre-domaine'));
+
+        var ok = true;
+
+        if (recherche && filtreGlobal.indexOf(recherche) === -1) {
+          ok = false;
+        }
+        if (ok && statut && filtreStatut !== statut) {
+          ok = false;
+        }
+        if (ok && module && filtreModule.indexOf(module) === -1) {
+          ok = false;
+        }
+        if (ok && domaine && filtreDomaine.indexOf(domaine) === -1) {
+          ok = false;
+        }
+
+        ligne.classList.toggle('ligne-masquee-filtre-demandes-domaines-test', !ok);
+
+        if (ok) {
+          visibles += 1;
+        }
+      });
+
+      resume.textContent = visibles + ' demande' + (visibles > 1 ? 's' : '') + ' affichée' + (visibles > 1 ? 's' : '') + '.';
+    }
+
+    [champRecherche, champStatut, champModule, champDomaine].forEach(function (champ) {
+      var evenement = champ.tagName === 'SELECT' ? 'change' : 'input';
+      champ.addEventListener(evenement, appliquerFiltres);
+    });
+
+    boutonReset.addEventListener('click', function () {
+      champRecherche.value = '';
+      champStatut.value = '';
+      champModule.value = '';
+      champDomaine.value = '';
+      appliquerFiltres();
+    });
+
+    appliquerFiltres();
   })();
   </script>
 
