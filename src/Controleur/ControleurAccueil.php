@@ -2089,7 +2089,7 @@ final class ControleurAccueil
         <h2 style="margin-top:0;">Valider la demande et créer la licence</h2>
         <div class="grille-form">
           <div class="champ"><label>Type de licence</label><select name="type_licence" id="sr_type_licence_decision"><option value="perpetuelle">perpétuelle</option><option value="abonnement">abonnement</option></select></div>
-          <div class="champ"><label>Version max autorisée</label><input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($demande['version_module'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*"></div>
+          <div class="champ"><label>Version max autorisée</label><input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars($this->suggererVersionMaxAutorisee((string)($demande['version_module'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*"></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de validité</label><input type="number" min="1" step="1" name="validite_valeur" value="12"></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Unité de validité</label><select name="validite_unite"><option value="jours">jours</option><option value="semaines">semaines</option><option value="mois" selected>mois</option><option value="annees">années</option></select></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de grâce</label><input type="number" min="0" step="1" name="grace_valeur" value="7"></div>
@@ -2942,6 +2942,21 @@ final class ControleurAccueil
             'invalide' => 'statut-invalide',
             default => 'statut-invalide',
         };
+    }
+
+
+    private function suggererVersionMaxAutorisee(string $version): string
+    {
+        $version = trim($version);
+        if ($version === '') {
+            return '';
+        }
+
+        if (preg_match('/^(\d+)\.(\d+)(?:\.\d+)?$/', $version, $matches)) {
+            return $matches[1] . '.' . $matches[2] . '.*';
+        }
+
+        return $version;
     }
 
     private function obtenirClasseStatutDemandeActivation(string $statut): string
