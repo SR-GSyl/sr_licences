@@ -52,3 +52,65 @@ CREATE TABLE IF NOT EXISTS sr_licence_demande_domaines_test (
     KEY idx_demande_domaines_test_code_module (code_module),
     KEY idx_demande_domaines_test_domaine_principal (domaine_principal)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table des paramètres applicatifs non sensibles
+CREATE TABLE IF NOT EXISTS sr_parametre_application (
+    id_parametre INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    groupe_parametre VARCHAR(64) NOT NULL,
+    cle_parametre VARCHAR(191) NOT NULL,
+    valeur_parametre TEXT DEFAULT NULL,
+    type_parametre ENUM('texte','booleen','entier','email','url','choix') NOT NULL DEFAULT 'texte',
+    modifiable_interface TINYINT(1) NOT NULL DEFAULT 1,
+    date_creation DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_maj DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_parametre),
+    UNIQUE KEY uniq_parametre_application_groupe_cle (groupe_parametre, cle_parametre),
+    KEY idx_parametre_application_groupe (groupe_parametre),
+    KEY idx_parametre_application_modifiable_interface (modifiable_interface)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Table des secrets applicatifs chiffrés
+CREATE TABLE IF NOT EXISTS sr_secret_application (
+    id_secret INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    groupe_secret VARCHAR(64) NOT NULL,
+    cle_secret VARCHAR(191) NOT NULL,
+    valeur_chiffree LONGTEXT NOT NULL,
+    nonce_chiffrement VARCHAR(255) NOT NULL,
+    version_chiffrement VARCHAR(32) NOT NULL DEFAULT 'sodium-v1',
+    modifiable_interface TINYINT(1) NOT NULL DEFAULT 0,
+    date_creation DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_maj DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_secret),
+    UNIQUE KEY uniq_secret_application_groupe_cle (groupe_secret, cle_secret),
+    KEY idx_secret_application_groupe (groupe_secret),
+    KEY idx_secret_application_modifiable_interface (modifiable_interface),
+    KEY idx_secret_application_version_chiffrement (version_chiffrement)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Paramètres applicatifs par défaut pour les notifications e-mail
+INSERT IGNORE INTO sr_parametre_application
+    (groupe_parametre, cle_parametre, valeur_parametre, type_parametre, modifiable_interface)
+VALUES
+    ('notifications', 'activees', '1', 'booleen', 1),
+    ('notifications', 'email_destinataire', '', 'email', 1),
+    ('notifications', 'email_destinataire_activation', '', 'email', 1),
+    ('notifications', 'email_destinataire_domaines_test', '', 'email', 1),
+    ('notifications', 'prefixe_sujet', '[SR Licences]', 'texte', 1),
+
+    ('email', 'transport', 'mail', 'choix', 1),
+    ('email', 'expediteur_email', '', 'email', 1),
+    ('email', 'expediteur_nom', 'SR Licences', 'texte', 1),
+    ('email', 'repondre_a_email', '', 'email', 1),
+    ('email', 'repondre_a_nom', '', 'texte', 1),
+
+    ('email_smtp', 'hote', '', 'texte', 1),
+    ('email_smtp', 'port', '587', 'entier', 1),
+    ('email_smtp', 'chiffrement', 'tls', 'choix', 1),
+    ('email_smtp', 'authentification', '1', 'booleen', 1),
+    ('email_smtp', 'utilisateur', '', 'texte', 1),
+
+    ('email_transactionnel', 'fournisseur', '', 'texte', 1),
+    ('email_transactionnel', 'endpoint', '', 'url', 1);
+

@@ -11,8 +11,10 @@ use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\DemandeDomainesTestRepository;
 use SrLicences\Repository\LicenceRepository;
 use SrLicences\Service\ServiceDemandeActivation;
+use SrLicences\Service\ServiceConfigurationNotifications;
 use SrLicences\Service\ServiceDemandeDomainesTest;
 use SrLicences\Service\ServiceLicence;
+use SrLicences\Service\ServiceNotificationEmail;
 use SrLicences\Service\ServiceSignatureLicence;
 use Throwable;
 
@@ -75,7 +77,8 @@ final class ControleurApiLicence
             $resultat = $service->demanderActivation($donneesEntree);
 
             if (!empty($resultat['ok'])) {
-                $this->envoyerNotificationNouvelleDemandeActivation($resultat, $donneesEntree);
+                $configurationNotifications = (new ServiceConfigurationNotifications($pdo, $this->config))->recupererConfiguration();
+                $this->envoyerNotificationNouvelleDemandeActivation($resultat, $donneesEntree, $configurationNotifications);
             }
 
             ReponseJson::envoyer($resultat, 200);
@@ -127,7 +130,14 @@ final class ControleurApiLicence
                 new LicenceRepository($pdo)
             );
 
-            $resultat = $service->demanderMiseAJourDomainesTest(Requete::donneesEntree());
+            $donneesEntree = Requete::donneesEntree();
+            $resultat = $service->demanderMiseAJourDomainesTest($donneesEntree);
+
+            if (!empty($resultat['ok'])) {
+                $configurationNotifications = (new ServiceConfigurationNotifications($pdo, $this->config))->recupererConfiguration();
+                $this->envoyerNotificationNouvelleDemandeDomainesTest($resultat, $donneesEntree, $configurationNotifications);
+            }
+
             ReponseJson::envoyer($resultat, 200);
         } catch (InvalidArgumentException $e) {
             ReponseJson::envoyer([
@@ -169,16 +179,18 @@ final class ControleurApiLicence
     }
 
 
-    private function envoyerNotificationNouvelleDemandeActivation(array $resultat, array $donneesEntree): void
+    private function envoyerNotificationNouvelleDemandeActivation(array $resultat, array $donneesEntree, array $configurationNotifications): void
     {
-        $notifications = is_array($this->config['notifications'] ?? null) ? $this->config['notifications'] : [];
+        $notifications = is_array($configurationNotifications['notifications'] ?? null) ? $configurationNotifications['notifications'] : [];
+        if (!((bool)($notifications['activees'] ?? true))) {
+            return;
+        }
 
         $destinataire = trim((string)($notifications['email_destinataire_activation'] ?? $notifications['email_destinataire'] ?? ''));
         if ($destinataire === '' || filter_var($destinataire, FILTER_VALIDATE_EMAIL) === false) {
             return;
         }
 
-        $expediteur = trim((string)($notifications['email_expediteur'] ?? ''));
         $prefixeSujet = trim((string)($notifications['prefixe_sujet'] ?? '[SR Licences]'));
 
         $idDemande = (int)($resultat['id_demande_activation'] ?? 0);
@@ -211,16 +223,52 @@ final class ControleurApiLicence
             $lienDemande !== '' ? 'Lien admin : ' . $lienDemande : '',
         ]));
 
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-        ];
+        $serviceNotificationEmail = new ServiceNotificationEmail($configurationNotifications);
+        $serviceNotificationEmail->envoyer($destinataire, $sujet, $message);
+    }
 
-        if ($expediteur !== '' && filter_var($expediteur, FILTER_VALIDATE_EMAIL) !== false) {
-            $headers[] = 'From: ' . $expediteur;
+    private function envoyerNotificationNouvelleDemandeDomainesTest(array $resultat, array $donneesEntree, array $configurationNotifications): void
+    {
+        $notifications = is_array($configurationNotifications['notifications'] ?? null) ? $configurationNotifications['notifications'] : [];
+        if (!((bool)($notifications['activees'] ?? true))) {
+            return;
         }
 
-        @mail($destinataire, $this->encoderSujetUtf8($sujet), $message, implode("\r\n", $headers));
+        $destinataire = trim((string)($notifications['email_destinataire_domaines_test'] ?? $notifications['email_destinataire'] ?? ''));
+        if ($destinataire === '' || filter_var($destinataire, FILTER_VALIDATE_EMAIL) === false) {
+            return;
+        }
+
+        $prefixeSujet = trim((string)($notifications['prefixe_sujet'] ?? '[SR Licences]'));
+
+        $idDemande = (int)($resultat['id_demande_domaines_test'] ?? 0);
+        $codeModule = trim((string)($donneesEntree['code_module'] ?? $donneesEntree['module'] ?? ''));
+        $cleLicence = trim((string)($donneesEntree['cle_licence'] ?? $donneesEntree['licence_key'] ?? ''));
+        $domainePrincipal = trim((string)($donneesEntree['domaine_principal'] ?? $donneesEntree['domain'] ?? $donneesEntree['domaine'] ?? ''));
+        $domainesDemandes = trim((string)($donneesEntree['domaines_test_demandes'] ?? $donneesEntree['domaines_test'] ?? ''));
+        $motif = trim((string)($donneesEntree['motif'] ?? ''));
+
+        $baseAdmin = trim((string)($this->config['application_url_admin'] ?? $this->config['application_url'] ?? ''));
+        $lienDemande = $baseAdmin !== ''
+            ? rtrim($baseAdmin, '/') . '/demandes-domaines-test/voir?id=' . $idDemande
+            : '';
+
+        $sujet = trim($prefixeSujet . ' Nouvelle demande de domaines de test #' . $idDemande);
+
+        $message = implode("\n", array_filter([
+            'Une nouvelle demande de mise à jour des domaines de test a été enregistrée.',
+            '',
+            'ID : ' . $idDemande,
+            $codeModule !== '' ? 'Module : ' . $codeModule : '',
+            $cleLicence !== '' ? 'Clé de licence : ' . $cleLicence : '',
+            $domainePrincipal !== '' ? 'Domaine principal : ' . $domainePrincipal : '',
+            $domainesDemandes !== '' ? 'Domaines demandés : ' . $domainesDemandes : '',
+            $motif !== '' ? 'Motif : ' . $motif : '',
+            $lienDemande !== '' ? 'Lien admin : ' . $lienDemande : '',
+        ]));
+
+        $serviceNotificationEmail = new ServiceNotificationEmail($configurationNotifications);
+        $serviceNotificationEmail->envoyer($destinataire, $sujet, $message);
     }
 
     private function encoderSujetUtf8(string $sujet): string
