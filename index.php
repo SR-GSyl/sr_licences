@@ -191,6 +191,10 @@ switch ($chemin) {
         (new ControleurAccueil($config))->apiSurveillanceDemandesDomainesTest();
         break;
 
+    case '/parametres/notifications':
+        (new ControleurAccueil($config))->afficherParametresNotifications();
+        break;
+
     default:
         http_response_code(404);
         header('Content-Type: text/plain; charset=UTF-8');

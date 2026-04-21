@@ -8,9 +8,11 @@ use SrLicences\Http\ReponseJson;
 use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\DemandeDomainesTestRepository;
 use SrLicences\Repository\LicenceRepository;
+use SrLicences\Service\ServiceConfigurationNotifications;
 use SrLicences\Service\ServiceDemandeActivation;
 use SrLicences\Service\ServiceDemandeDomainesTest;
 use SrLicences\Service\ServiceLicence;
+use SrLicences\Service\ServiceSecretApplication;
 use Throwable;
 
 final class ControleurAccueil
@@ -286,6 +288,12 @@ final class ControleurAccueil
         <h2 class="titre">API santé</h2>
         <div class="valeur-mini"><a href="/api/sante">/api/sante</a></div>
         <p class="muted">Route minimale de contrôle technique.</p>
+      </div>
+
+      <div class="carte">
+        <h2 class="titre">Notifications e-mail</h2>
+        <div class="valeur-mini"><a href="/parametres/notifications">Paramétrer</a></div>
+        <p class="muted">Accès aux réglages et futurs tests d’envoi.</p>
       </div>
     </div>
 
@@ -3248,4 +3256,208 @@ final class ControleurAccueil
 
         return date('d/m/Y H:i', $timestamp);
     }
+
+    public function afficherParametresNotifications(): void
+    {
+        if (empty($_SESSION['sr_licences_csrf'])) {
+            $_SESSION['sr_licences_csrf'] = bin2hex(random_bytes(16));
+        }
+
+        $utilisateur = (string)($_SESSION['sr_licences_utilisateur'] ?? '');
+        $messageErreur = '';
+        $configurationNotifications = [
+            'notifications' => [],
+            'email' => [
+                'smtp' => [],
+                'transactionnel' => [],
+            ],
+        ];
+        $secrets = [
+            'smtp_mot_de_passe_configure' => false,
+            'transactionnel_cle_api_configuree' => false,
+        ];
+
+        try {
+            $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
+            $serviceConfigurationNotifications = new ServiceConfigurationNotifications($pdo, $this->config);
+            $serviceSecretApplication = new ServiceSecretApplication($pdo, $this->config);
+
+            $configurationNotifications = $serviceConfigurationNotifications->recupererConfiguration();
+            $secrets['smtp_mot_de_passe_configure'] = $serviceSecretApplication->secretExiste('email_smtp', 'mot_de_passe');
+            $secrets['transactionnel_cle_api_configuree'] = $serviceSecretApplication->secretExiste('email_transactionnel', 'cle_api');
+        } catch (Throwable $e) {
+            $messageErreur = 'Chargement impossible : ' . $e->getMessage();
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        ?>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Paramètres notifications - SR Licences</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#1f2937}
+    .conteneur{max-width:1100px;margin:0 auto;padding:24px}
+    .entete{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+    h1{margin:0;font-size:28px}
+    .muted{color:#64748b}
+    .alerte-ko{margin:14px 0;padding:12px 14px;border-radius:12px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+    .carte{background:#fff;border:1px solid #dbe3ea;border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(15,23,42,.04)}
+    .grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .section{margin-top:18px}
+    .section h2{margin:0 0 12px 0;font-size:20px}
+    .liste{display:grid;gap:10px}
+    .ligne{display:grid;grid-template-columns:minmax(180px,280px) 1fr;gap:12px;align-items:start;padding:10px 0;border-top:1px solid #eef2f7}
+    .ligne:first-child{border-top:0;padding-top:0}
+    .libelle{font-weight:700}
+    .valeur{word-break:break-word}
+    .etat-ok{color:#166534;font-weight:700}
+    .etat-neutre{color:#475569;font-weight:700}
+    .actions{display:flex;flex-wrap:wrap;gap:10px}
+    .bouton-secondaire{display:inline-block;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;text-decoration:none;font-weight:700}
+    .note{margin-top:14px;padding:12px 14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;color:#1e3a8a}
+    @media (max-width: 700px){
+      .ligne{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="conteneur">
+    <div class="entete">
+      <div>
+        <h1>Paramètres notifications</h1>
+        <div class="muted">Utilisateur connecté : <?php echo htmlspecialchars($utilisateur, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+      <div class="actions">
+        <a class="bouton-secondaire" href="/">Retour au tableau de bord</a>
+      </div>
+    </div>
+
+    <?php if ($messageErreur !== ''): ?>
+      <div class="alerte-ko"><?php echo htmlspecialchars($messageErreur, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <div class="grille">
+      <div class="carte">
+        <h2 style="margin-top:0;">Notifications</h2>
+        <div class="liste">
+          <div class="ligne">
+            <div class="libelle">Activées</div>
+            <div class="valeur"><?php echo !empty($configurationNotifications['notifications']['activees']) ? 'Oui' : 'Non'; ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Destinataire général</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Destinataire activation</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire_activation'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Destinataire domaines de test</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire_domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Préfixe sujet</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['prefixe_sujet'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="carte">
+        <h2 style="margin-top:0;">Transport e-mail</h2>
+        <div class="liste">
+          <div class="ligne">
+            <div class="libelle">Transport</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transport'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Expéditeur</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['expediteur_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Nom expéditeur</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['expediteur_nom'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Répondre à</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['repondre_a_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Nom “répondre à”</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['repondre_a_nom'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="carte">
+        <h2>SMTP</h2>
+        <div class="liste">
+          <div class="ligne">
+            <div class="libelle">Hôte</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['hote'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Port</div>
+            <div class="valeur"><?php echo (int)($configurationNotifications['email']['smtp']['port'] ?? 0); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Chiffrement</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['chiffrement'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Authentification</div>
+            <div class="valeur"><?php echo !empty($configurationNotifications['email']['smtp']['authentification']) ? 'Oui' : 'Non'; ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Utilisateur</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['utilisateur'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Mot de passe SMTP</div>
+            <div class="valeur <?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'etat-ok' : 'etat-neutre'; ?>">
+              <?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'Déjà configuré' : 'Non configuré'; ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="carte">
+        <h2>Transactionnel</h2>
+        <div class="liste">
+          <div class="ligne">
+            <div class="libelle">Fournisseur</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transactionnel']['fournisseur'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Endpoint</div>
+            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transactionnel']['endpoint'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+          </div>
+          <div class="ligne">
+            <div class="libelle">Clé API</div>
+            <div class="valeur <?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'etat-ok' : 'etat-neutre'; ?>">
+              <?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'Déjà configurée' : 'Non configurée'; ?>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      Cet écran est la première étape de l’interface d’administration des notifications.
+      La modification des paramètres et le test d’envoi depuis l’interface seront ajoutés ensuite.
+    </div>
+  </div>
+</body>
+</html>
+        <?php
+    }
+
+
 }

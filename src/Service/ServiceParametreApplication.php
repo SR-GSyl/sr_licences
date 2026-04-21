@@ -100,11 +100,98 @@ final class ServiceParametreApplication
                 continue;
             }
 
-            $resultat[$cle] = isset($ligne['valeur_parametre'])
-                ? (string)$ligne['valeur_parametre']
+            $resultat[$cle] = array_key_exists('valeur_parametre', $ligne)
+                ? ($ligne['valeur_parametre'] === null ? null : (string)$ligne['valeur_parametre'])
                 : null;
         }
 
         return $resultat;
+    }
+
+    public function enregistrerValeurTexte(
+        string $groupeParametre,
+        string $cleParametre,
+        ?string $valeurParametre,
+        string $typeParametre = 'texte',
+        bool $modifiableInterface = true
+    ): void {
+        $this->enregistrerValeur(
+            $groupeParametre,
+            $cleParametre,
+            $valeurParametre,
+            $typeParametre,
+            $modifiableInterface
+        );
+    }
+
+    public function enregistrerValeurBooleenne(
+        string $groupeParametre,
+        string $cleParametre,
+        bool $valeurParametre,
+        bool $modifiableInterface = true
+    ): void {
+        $this->enregistrerValeur(
+            $groupeParametre,
+            $cleParametre,
+            $valeurParametre ? '1' : '0',
+            'booleen',
+            $modifiableInterface
+        );
+    }
+
+    public function enregistrerValeurEntiere(
+        string $groupeParametre,
+        string $cleParametre,
+        int $valeurParametre,
+        bool $modifiableInterface = true
+    ): void {
+        $this->enregistrerValeur(
+            $groupeParametre,
+            $cleParametre,
+            (string)$valeurParametre,
+            'entier',
+            $modifiableInterface
+        );
+    }
+
+    private function enregistrerValeur(
+        string $groupeParametre,
+        string $cleParametre,
+        ?string $valeurParametre,
+        string $typeParametre,
+        bool $modifiableInterface
+    ): void {
+        $groupeParametre = trim($groupeParametre);
+        $cleParametre = trim($cleParametre);
+        $typeParametre = trim($typeParametre);
+
+        if ($groupeParametre === '' || $cleParametre === '') {
+            throw new \InvalidArgumentException('Le groupe et la clé du paramètre sont obligatoires.');
+        }
+
+        if (!in_array($typeParametre, ['texte', 'booleen', 'entier', 'email', 'url', 'choix'], true)) {
+            throw new \InvalidArgumentException('Type de paramètre non supporté : ' . $typeParametre);
+        }
+
+        $sql = "
+            INSERT INTO sr_parametre_application
+                (groupe_parametre, cle_parametre, valeur_parametre, type_parametre, modifiable_interface)
+            VALUES
+                (:groupe_parametre, :cle_parametre, :valeur_parametre, :type_parametre, :modifiable_interface)
+            ON DUPLICATE KEY UPDATE
+                valeur_parametre = VALUES(valeur_parametre),
+                type_parametre = VALUES(type_parametre),
+                modifiable_interface = VALUES(modifiable_interface),
+                date_maj = CURRENT_TIMESTAMP
+        ";
+
+        $statement = $this->pdo->prepare($sql);
+        $statement->execute([
+            'groupe_parametre' => $groupeParametre,
+            'cle_parametre' => $cleParametre,
+            'valeur_parametre' => $valeurParametre,
+            'type_parametre' => $typeParametre,
+            'modifiable_interface' => $modifiableInterface ? 1 : 0,
+        ]);
     }
 }

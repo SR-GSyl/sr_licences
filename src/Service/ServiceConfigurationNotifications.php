@@ -8,10 +8,12 @@ use PDO;
 final class ServiceConfigurationNotifications
 {
     private ServiceParametreApplication $serviceParametreApplication;
+    private ServiceSecretApplication $serviceSecretApplication;
 
     public function __construct(private PDO $pdo, private array $config)
     {
         $this->serviceParametreApplication = new ServiceParametreApplication($this->pdo);
+        $this->serviceSecretApplication = new ServiceSecretApplication($this->pdo, $this->config);
     }
 
     public function recupererConfiguration(): array
@@ -111,7 +113,11 @@ final class ServiceConfigurationNotifications
                         'utilisateur',
                         (string)($smtpConfig['utilisateur'] ?? '')
                     )),
-                    'mot_de_passe' => (string)($smtpConfig['mot_de_passe'] ?? ''),
+                    'mot_de_passe' => $this->recupererSecretOuValeurParDefaut(
+                        'email_smtp',
+                        'mot_de_passe',
+                        (string)($smtpConfig['mot_de_passe'] ?? '')
+                    ),
                     'timeout_secondes' => (int)($smtpConfig['timeout_secondes'] ?? 15),
                 ],
                 'transactionnel' => [
@@ -125,10 +131,26 @@ final class ServiceConfigurationNotifications
                         'endpoint',
                         (string)($transactionnelConfig['endpoint'] ?? '')
                     )),
-                    'cle_api' => (string)($transactionnelConfig['cle_api'] ?? ''),
+                    'cle_api' => $this->recupererSecretOuValeurParDefaut(
+                        'email_transactionnel',
+                        'cle_api',
+                        (string)($transactionnelConfig['cle_api'] ?? '')
+                    ),
                     'timeout_secondes' => (int)($transactionnelConfig['timeout_secondes'] ?? 15),
                 ],
             ],
         ];
+    }
+
+    private function recupererSecretOuValeurParDefaut(string $groupeSecret, string $cleSecret, string $valeurParDefaut = ''): string
+    {
+        if ($this->serviceSecretApplication->secretExiste($groupeSecret, $cleSecret)) {
+            $secret = $this->serviceSecretApplication->recupererSecretDechiffre($groupeSecret, $cleSecret);
+            if ($secret !== null) {
+                return $secret;
+            }
+        }
+
+        return $valeurParDefaut;
     }
 }
