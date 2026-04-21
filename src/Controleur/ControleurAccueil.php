@@ -12,6 +12,8 @@ use SrLicences\Service\ServiceConfigurationNotifications;
 use SrLicences\Service\ServiceDemandeActivation;
 use SrLicences\Service\ServiceDemandeDomainesTest;
 use SrLicences\Service\ServiceLicence;
+use SrLicences\Service\ServiceNotificationEmail;
+use SrLicences\Service\ServiceParametreApplication;
 use SrLicences\Service\ServiceSecretApplication;
 use Throwable;
 
@@ -3257,6 +3259,7 @@ final class ControleurAccueil
         return date('d/m/Y H:i', $timestamp);
     }
 
+
     public function afficherParametresNotifications(): void
     {
         if (empty($_SESSION['sr_licences_csrf'])) {
@@ -3264,7 +3267,8 @@ final class ControleurAccueil
         }
 
         $utilisateur = (string)($_SESSION['sr_licences_utilisateur'] ?? '');
-        $messageErreur = '';
+        $messagesSucces = [];
+        $messagesErreur = [];
         $configurationNotifications = [
             'notifications' => [],
             'email' => [
@@ -3272,6 +3276,7 @@ final class ControleurAccueil
                 'transactionnel' => [],
             ],
         ];
+        $valeursFormulaire = $this->normaliserDonneesFormulaireNotifications([], $configurationNotifications);
         $secrets = [
             'smtp_mot_de_passe_configure' => false,
             'transactionnel_cle_api_configuree' => false,
@@ -3280,13 +3285,62 @@ final class ControleurAccueil
         try {
             $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
             $serviceConfigurationNotifications = new ServiceConfigurationNotifications($pdo, $this->config);
+            $serviceParametreApplication = new ServiceParametreApplication($pdo);
             $serviceSecretApplication = new ServiceSecretApplication($pdo, $this->config);
 
             $configurationNotifications = $serviceConfigurationNotifications->recupererConfiguration();
+            $valeursFormulaire = $this->normaliserDonneesFormulaireNotifications([], $configurationNotifications);
+
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                $donneesSoumises = $this->normaliserDonneesFormulaireNotifications($_POST, $configurationNotifications);
+                $valeursFormulaire = $donneesSoumises;
+                $action = trim((string)($_POST['action_notifications'] ?? 'enregistrer'));
+                $csrfTokenFormulaire = (string)($_POST['csrf_token'] ?? '');
+
+                if (!hash_equals((string)($_SESSION['sr_licences_csrf'] ?? ''), $csrfTokenFormulaire)) {
+                    $messagesErreur[] = 'Jeton de sécurité invalide. Rechargez la page avant de réessayer.';
+                } else {
+                    $messagesErreur = array_merge($messagesErreur, $this->validerDonneesFormulaireNotifications($donneesSoumises));
+
+                    if ($messagesErreur === []) {
+                        $this->enregistrerDonneesFormulaireNotifications(
+                            $serviceParametreApplication,
+                            $serviceSecretApplication,
+                            $donneesSoumises
+                        );
+
+                        $configurationNotifications = $serviceConfigurationNotifications->recupererConfiguration();
+                        $valeursFormulaire = $this->normaliserDonneesFormulaireNotifications([], $configurationNotifications);
+                        $messagesSucces[] = 'Paramètres enregistrés.';
+
+                        if ($action === 'tester_envoi') {
+                            $destinataireTest = $this->determinerDestinataireTestNotification($configurationNotifications);
+
+                            if ($destinataireTest === '') {
+                                $messagesErreur[] = 'Aucun destinataire n’est configuré pour le test d’envoi.';
+                            } else {
+                                $serviceNotificationEmail = new ServiceNotificationEmail($configurationNotifications);
+                                $testOk = $serviceNotificationEmail->envoyer(
+                                    $destinataireTest,
+                                    $this->construireSujetTestNotification($configurationNotifications),
+                                    $this->construireMessageTestNotification($configurationNotifications, $destinataireTest)
+                                );
+
+                                if ($testOk) {
+                                    $messagesSucces[] = 'E-mail de test envoyé à ' . $destinataireTest . '.';
+                                } else {
+                                    $messagesErreur[] = 'Échec de l’envoi du test. Vérifie le transport et ses paramètres.';
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             $secrets['smtp_mot_de_passe_configure'] = $serviceSecretApplication->secretExiste('email_smtp', 'mot_de_passe');
             $secrets['transactionnel_cle_api_configuree'] = $serviceSecretApplication->secretExiste('email_transactionnel', 'cle_api');
         } catch (Throwable $e) {
-            $messageErreur = 'Chargement impossible : ' . $e->getMessage();
+            $messagesErreur[] = 'Chargement impossible : ' . $e->getMessage();
         }
 
         header('Content-Type: text/html; charset=UTF-8');
@@ -3302,24 +3356,28 @@ final class ControleurAccueil
     .conteneur{max-width:1100px;margin:0 auto;padding:24px}
     .entete{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
     h1{margin:0;font-size:28px}
+    h2{margin:0 0 14px 0;font-size:20px}
     .muted{color:#64748b}
-    .alerte-ko{margin:14px 0;padding:12px 14px;border-radius:12px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+    .alerte-ok,.alerte-ko{margin:14px 0;padding:12px 14px;border-radius:12px;border:1px solid}
+    .alerte-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+    .alerte-ko{background:#fee2e2;color:#991b1b;border-color:#fecaca}
     .carte{background:#fff;border:1px solid #dbe3ea;border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(15,23,42,.04)}
-    .grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
     .section{margin-top:18px}
-    .section h2{margin:0 0 12px 0;font-size:20px}
-    .liste{display:grid;gap:10px}
-    .ligne{display:grid;grid-template-columns:minmax(180px,280px) 1fr;gap:12px;align-items:start;padding:10px 0;border-top:1px solid #eef2f7}
-    .ligne:first-child{border-top:0;padding-top:0}
-    .libelle{font-weight:700}
-    .valeur{word-break:break-word}
+    .grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+    .champ{display:grid;gap:6px;margin-bottom:14px}
+    .champ label{font-weight:700}
+    .champ input,.champ select{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a}
+    .champ small{color:#64748b}
+    .ligne-inline{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
     .etat-ok{color:#166534;font-weight:700}
     .etat-neutre{color:#475569;font-weight:700}
-    .actions{display:flex;flex-wrap:wrap;gap:10px}
-    .bouton-secondaire{display:inline-block;padding:10px 14px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;text-decoration:none;font-weight:700}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+    .bouton-principal,.bouton-secondaire{display:inline-block;padding:11px 15px;border-radius:10px;font-weight:700;text-decoration:none;border:1px solid}
+    .bouton-principal{background:#2563eb;color:#fff;border-color:#2563eb;cursor:pointer}
+    .bouton-secondaire{background:#fff;color:#0f172a;border-color:#cbd5e1}
     .note{margin-top:14px;padding:12px 14px;border:1px solid #dbeafe;border-radius:12px;background:#eff6ff;color:#1e3a8a}
     @media (max-width: 700px){
-      .ligne{grid-template-columns:1fr}
+      .conteneur{padding:16px}
     }
   </style>
 </head>
@@ -3328,136 +3386,461 @@ final class ControleurAccueil
     <div class="entete">
       <div>
         <h1>Paramètres notifications</h1>
-        <div class="muted">Utilisateur connecté : <?php echo htmlspecialchars($utilisateur, ENT_QUOTES, 'UTF-8'); ?></div>
+        <div class="muted">Utilisateur connecté : <?php echo $this->echapperHtml($utilisateur); ?></div>
       </div>
       <div class="actions">
         <a class="bouton-secondaire" href="/">Retour au tableau de bord</a>
       </div>
     </div>
 
-    <?php if ($messageErreur !== ''): ?>
-      <div class="alerte-ko"><?php echo htmlspecialchars($messageErreur, ENT_QUOTES, 'UTF-8'); ?></div>
-    <?php endif; ?>
+    <?php foreach ($messagesSucces as $messageSucces): ?>
+      <div class="alerte-ok"><?php echo $this->echapperHtml($messageSucces); ?></div>
+    <?php endforeach; ?>
 
-    <div class="grille">
-      <div class="carte">
-        <h2 style="margin-top:0;">Notifications</h2>
-        <div class="liste">
-          <div class="ligne">
-            <div class="libelle">Activées</div>
-            <div class="valeur"><?php echo !empty($configurationNotifications['notifications']['activees']) ? 'Oui' : 'Non'; ?></div>
+    <?php foreach ($messagesErreur as $messageErreur): ?>
+      <div class="alerte-ko"><?php echo $this->echapperHtml($messageErreur); ?></div>
+    <?php endforeach; ?>
+
+    <form method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="<?php echo $this->echapperHtml((string)($_SESSION['sr_licences_csrf'] ?? '')); ?>">
+
+      <div class="grille">
+        <div class="carte">
+          <h2>Notifications</h2>
+
+          <div class="champ">
+            <label class="ligne-inline">
+              <input type="checkbox" name="notifications_activees" value="1" <?php echo !empty($valeursFormulaire['notifications']['activees']) ? 'checked' : ''; ?>>
+              <span>Activer les notifications e-mail</span>
+            </label>
           </div>
-          <div class="ligne">
-            <div class="libelle">Destinataire général</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+
+          <div class="champ">
+            <label for="notifications_email_destinataire">Destinataire général</label>
+            <input id="notifications_email_destinataire" type="email" name="notifications_email_destinataire" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['notifications']['email_destinataire'] ?? '')); ?>">
           </div>
-          <div class="ligne">
-            <div class="libelle">Destinataire activation</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire_activation'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+
+          <div class="champ">
+            <label for="notifications_email_destinataire_activation">Destinataire activation</label>
+            <input id="notifications_email_destinataire_activation" type="email" name="notifications_email_destinataire_activation" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['notifications']['email_destinataire_activation'] ?? '')); ?>">
           </div>
-          <div class="ligne">
-            <div class="libelle">Destinataire domaines de test</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['email_destinataire_domaines_test'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+
+          <div class="champ">
+            <label for="notifications_email_destinataire_domaines_test">Destinataire domaines de test</label>
+            <input id="notifications_email_destinataire_domaines_test" type="email" name="notifications_email_destinataire_domaines_test" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['notifications']['email_destinataire_domaines_test'] ?? '')); ?>">
           </div>
-          <div class="ligne">
-            <div class="libelle">Préfixe sujet</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['notifications']['prefixe_sujet'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
+
+          <div class="champ">
+            <label for="notifications_prefixe_sujet">Préfixe du sujet</label>
+            <input id="notifications_prefixe_sujet" type="text" name="notifications_prefixe_sujet" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['notifications']['prefixe_sujet'] ?? '')); ?>">
+          </div>
+        </div>
+
+        <div class="carte">
+          <h2>Transport e-mail</h2>
+
+          <div class="champ">
+            <label for="email_transport">Transport</label>
+            <select id="email_transport" name="email_transport">
+              <?php $transportCourant = (string)($valeursFormulaire['email']['transport'] ?? 'mail'); ?>
+              <option value="mail" <?php echo $transportCourant === 'mail' ? 'selected' : ''; ?>>mail</option>
+              <option value="smtp" <?php echo $transportCourant === 'smtp' ? 'selected' : ''; ?>>smtp</option>
+              <option value="transactionnel" <?php echo $transportCourant === 'transactionnel' ? 'selected' : ''; ?>>transactionnel</option>
+            </select>
+          </div>
+
+          <div class="champ">
+            <label for="email_expediteur_email">E-mail expéditeur</label>
+            <input id="email_expediteur_email" type="email" name="email_expediteur_email" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['expediteur_email'] ?? '')); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="email_expediteur_nom">Nom expéditeur</label>
+            <input id="email_expediteur_nom" type="text" name="email_expediteur_nom" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['expediteur_nom'] ?? '')); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="email_repondre_a_email">Répondre à</label>
+            <input id="email_repondre_a_email" type="email" name="email_repondre_a_email" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['repondre_a_email'] ?? '')); ?>">
+          </div>
+
+          <div class="champ">
+            <label for="email_repondre_a_nom">Nom “répondre à”</label>
+            <input id="email_repondre_a_nom" type="text" name="email_repondre_a_nom" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['repondre_a_nom'] ?? '')); ?>">
           </div>
         </div>
       </div>
 
-      <div class="carte">
-        <h2 style="margin-top:0;">Transport e-mail</h2>
-        <div class="liste">
-          <div class="ligne">
-            <div class="libelle">Transport</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transport'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Expéditeur</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['expediteur_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Nom expéditeur</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['expediteur_nom'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Répondre à</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['repondre_a_email'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Nom “répondre à”</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['repondre_a_nom'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <div class="section">
+        <div class="carte">
+          <h2>SMTP</h2>
 
-    <div class="section">
-      <div class="carte">
-        <h2>SMTP</h2>
-        <div class="liste">
-          <div class="ligne">
-            <div class="libelle">Hôte</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['hote'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Port</div>
-            <div class="valeur"><?php echo (int)($configurationNotifications['email']['smtp']['port'] ?? 0); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Chiffrement</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['chiffrement'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Authentification</div>
-            <div class="valeur"><?php echo !empty($configurationNotifications['email']['smtp']['authentification']) ? 'Oui' : 'Non'; ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Utilisateur</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['smtp']['utilisateur'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Mot de passe SMTP</div>
-            <div class="valeur <?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'etat-ok' : 'etat-neutre'; ?>">
-              <?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'Déjà configuré' : 'Non configuré'; ?>
+          <div class="grille">
+            <div>
+              <div class="champ">
+                <label for="smtp_hote">Hôte</label>
+                <input id="smtp_hote" type="text" name="smtp_hote" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['smtp']['hote'] ?? '')); ?>">
+              </div>
+
+              <div class="champ">
+                <label for="smtp_port">Port</label>
+                <input id="smtp_port" type="number" min="1" max="65535" name="smtp_port" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['smtp']['port'] ?? '587')); ?>">
+              </div>
+
+              <div class="champ">
+                <label for="smtp_chiffrement">Chiffrement</label>
+                <?php $chiffrementCourant = (string)($valeursFormulaire['email']['smtp']['chiffrement'] ?? 'tls'); ?>
+                <select id="smtp_chiffrement" name="smtp_chiffrement">
+                  <option value="none" <?php echo $chiffrementCourant === 'none' ? 'selected' : ''; ?>>none</option>
+                  <option value="tls" <?php echo $chiffrementCourant === 'tls' ? 'selected' : ''; ?>>tls</option>
+                  <option value="ssl" <?php echo $chiffrementCourant === 'ssl' ? 'selected' : ''; ?>>ssl</option>
+                </select>
+              </div>
+
+              <div class="champ">
+                <label class="ligne-inline">
+                  <input type="checkbox" name="smtp_authentification" value="1" <?php echo !empty($valeursFormulaire['email']['smtp']['authentification']) ? 'checked' : ''; ?>>
+                  <span>Authentification SMTP activée</span>
+                </label>
+              </div>
+
+              <div class="champ">
+                <label for="smtp_utilisateur">Utilisateur SMTP</label>
+                <input id="smtp_utilisateur" type="text" name="smtp_utilisateur" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['smtp']['utilisateur'] ?? '')); ?>">
+              </div>
+            </div>
+
+            <div>
+              <div class="champ">
+                <label for="smtp_mot_de_passe">Mot de passe SMTP</label>
+                <input id="smtp_mot_de_passe" type="password" name="smtp_mot_de_passe" value="" autocomplete="new-password">
+                <small>Laisser vide pour conserver la valeur actuelle.</small>
+              </div>
+
+              <div class="champ">
+                <label class="ligne-inline">
+                  <input type="checkbox" name="smtp_mot_de_passe_effacer" value="1" <?php echo !empty($valeursFormulaire['secrets']['smtp_mot_de_passe_effacer']) ? 'checked' : ''; ?>>
+                  <span>Supprimer le mot de passe SMTP enregistré</span>
+                </label>
+                <small class="<?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'etat-ok' : 'etat-neutre'; ?>">
+                  <?php echo !empty($secrets['smtp_mot_de_passe_configure']) ? 'Mot de passe actuellement configuré.' : 'Aucun mot de passe SMTP enregistré.'; ?>
+                </small>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="section">
-      <div class="carte">
-        <h2>Transactionnel</h2>
-        <div class="liste">
-          <div class="ligne">
-            <div class="libelle">Fournisseur</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transactionnel']['fournisseur'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Endpoint</div>
-            <div class="valeur"><?php echo htmlspecialchars((string)($configurationNotifications['email']['transactionnel']['endpoint'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></div>
-          </div>
-          <div class="ligne">
-            <div class="libelle">Clé API</div>
-            <div class="valeur <?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'etat-ok' : 'etat-neutre'; ?>">
-              <?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'Déjà configurée' : 'Non configurée'; ?>
+      <div class="section">
+        <div class="carte">
+          <h2>Transactionnel</h2>
+
+          <div class="grille">
+            <div>
+              <div class="champ">
+                <label for="transactionnel_fournisseur">Fournisseur</label>
+                <input id="transactionnel_fournisseur" type="text" name="transactionnel_fournisseur" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['transactionnel']['fournisseur'] ?? '')); ?>">
+              </div>
+
+              <div class="champ">
+                <label for="transactionnel_endpoint">Endpoint</label>
+                <input id="transactionnel_endpoint" type="url" name="transactionnel_endpoint" value="<?php echo $this->echapperHtml((string)($valeursFormulaire['email']['transactionnel']['endpoint'] ?? '')); ?>">
+              </div>
+            </div>
+
+            <div>
+              <div class="champ">
+                <label for="transactionnel_cle_api">Clé API transactionnelle</label>
+                <input id="transactionnel_cle_api" type="password" name="transactionnel_cle_api" value="" autocomplete="new-password">
+                <small>Laisser vide pour conserver la valeur actuelle.</small>
+              </div>
+
+              <div class="champ">
+                <label class="ligne-inline">
+                  <input type="checkbox" name="transactionnel_cle_api_effacer" value="1" <?php echo !empty($valeursFormulaire['secrets']['transactionnel_cle_api_effacer']) ? 'checked' : ''; ?>>
+                  <span>Supprimer la clé API enregistrée</span>
+                </label>
+                <small class="<?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'etat-ok' : 'etat-neutre'; ?>">
+                  <?php echo !empty($secrets['transactionnel_cle_api_configuree']) ? 'Clé API actuellement configurée.' : 'Aucune clé API enregistrée.'; ?>
+                </small>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="note">
-      Cet écran est la première étape de l’interface d’administration des notifications.
-      La modification des paramètres et le test d’envoi depuis l’interface seront ajoutés ensuite.
-    </div>
+      <div class="actions">
+        <button class="bouton-principal" type="submit" name="action_notifications" value="enregistrer">Enregistrer</button>
+        <button class="bouton-secondaire" type="submit" name="action_notifications" value="tester_envoi">Enregistrer puis tester l’envoi</button>
+      </div>
+
+      <div class="note">
+        Les secrets sensibles ne sont jamais réaffichés. Un champ secret laissé vide conserve la valeur existante.
+      </div>
+    </form>
   </div>
 </body>
 </html>
         <?php
     }
 
+    private function normaliserDonneesFormulaireNotifications(array $source, array $configurationCourante): array
+    {
+        $modeFormulaire = $source !== [];
+
+        return [
+            'notifications' => [
+                'activees' => $modeFormulaire
+                    ? isset($source['notifications_activees'])
+                    : !empty($configurationCourante['notifications']['activees']),
+                'email_destinataire' => trim((string)($source['notifications_email_destinataire'] ?? $configurationCourante['notifications']['email_destinataire'] ?? '')),
+                'email_destinataire_activation' => trim((string)($source['notifications_email_destinataire_activation'] ?? $configurationCourante['notifications']['email_destinataire_activation'] ?? '')),
+                'email_destinataire_domaines_test' => trim((string)($source['notifications_email_destinataire_domaines_test'] ?? $configurationCourante['notifications']['email_destinataire_domaines_test'] ?? '')),
+                'prefixe_sujet' => trim((string)($source['notifications_prefixe_sujet'] ?? $configurationCourante['notifications']['prefixe_sujet'] ?? '[SR Licences]')),
+            ],
+            'email' => [
+                'transport' => trim((string)($source['email_transport'] ?? $configurationCourante['email']['transport'] ?? 'mail')),
+                'expediteur_email' => trim((string)($source['email_expediteur_email'] ?? $configurationCourante['email']['expediteur_email'] ?? '')),
+                'expediteur_nom' => trim((string)($source['email_expediteur_nom'] ?? $configurationCourante['email']['expediteur_nom'] ?? 'SR Licences')),
+                'repondre_a_email' => trim((string)($source['email_repondre_a_email'] ?? $configurationCourante['email']['repondre_a_email'] ?? '')),
+                'repondre_a_nom' => trim((string)($source['email_repondre_a_nom'] ?? $configurationCourante['email']['repondre_a_nom'] ?? '')),
+                'smtp' => [
+                    'hote' => trim((string)($source['smtp_hote'] ?? $configurationCourante['email']['smtp']['hote'] ?? '')),
+                    'port' => trim((string)($source['smtp_port'] ?? $configurationCourante['email']['smtp']['port'] ?? '587')),
+                    'chiffrement' => trim((string)($source['smtp_chiffrement'] ?? $configurationCourante['email']['smtp']['chiffrement'] ?? 'tls')),
+                    'authentification' => $modeFormulaire
+                        ? isset($source['smtp_authentification'])
+                        : !empty($configurationCourante['email']['smtp']['authentification']),
+                    'utilisateur' => trim((string)($source['smtp_utilisateur'] ?? $configurationCourante['email']['smtp']['utilisateur'] ?? '')),
+                ],
+                'transactionnel' => [
+                    'fournisseur' => trim((string)($source['transactionnel_fournisseur'] ?? $configurationCourante['email']['transactionnel']['fournisseur'] ?? '')),
+                    'endpoint' => trim((string)($source['transactionnel_endpoint'] ?? $configurationCourante['email']['transactionnel']['endpoint'] ?? '')),
+                ],
+            ],
+            'secrets' => [
+                'smtp_mot_de_passe' => (string)($source['smtp_mot_de_passe'] ?? ''),
+                'smtp_mot_de_passe_effacer' => isset($source['smtp_mot_de_passe_effacer']),
+                'transactionnel_cle_api' => (string)($source['transactionnel_cle_api'] ?? ''),
+                'transactionnel_cle_api_effacer' => isset($source['transactionnel_cle_api_effacer']),
+            ],
+        ];
+    }
+
+    private function validerDonneesFormulaireNotifications(array $donnees): array
+    {
+        $erreurs = [];
+
+        foreach ([
+            'Destinataire général' => (string)($donnees['notifications']['email_destinataire'] ?? ''),
+            'Destinataire activation' => (string)($donnees['notifications']['email_destinataire_activation'] ?? ''),
+            'Destinataire domaines de test' => (string)($donnees['notifications']['email_destinataire_domaines_test'] ?? ''),
+            'E-mail expéditeur' => (string)($donnees['email']['expediteur_email'] ?? ''),
+            'Répondre à' => (string)($donnees['email']['repondre_a_email'] ?? ''),
+        ] as $libelle => $email) {
+            if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                $erreurs[] = $libelle . ' invalide.';
+            }
+        }
+
+        $transport = (string)($donnees['email']['transport'] ?? '');
+        if (!in_array($transport, ['mail', 'smtp', 'transactionnel'], true)) {
+            $erreurs[] = 'Transport e-mail invalide.';
+        }
+
+        $chiffrement = (string)($donnees['email']['smtp']['chiffrement'] ?? '');
+        if (!in_array($chiffrement, ['none', 'tls', 'ssl'], true)) {
+            $erreurs[] = 'Chiffrement SMTP invalide.';
+        }
+
+        $port = (string)($donnees['email']['smtp']['port'] ?? '');
+        if ($port === '' || filter_var($port, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 65535]]) === false) {
+            $erreurs[] = 'Port SMTP invalide.';
+        }
+
+        $endpoint = (string)($donnees['email']['transactionnel']['endpoint'] ?? '');
+        if ($endpoint !== '' && filter_var($endpoint, FILTER_VALIDATE_URL) === false) {
+            $erreurs[] = 'Endpoint transactionnel invalide.';
+        }
+
+        if (!empty($donnees['secrets']['smtp_mot_de_passe_effacer']) && (string)($donnees['secrets']['smtp_mot_de_passe'] ?? '') !== '') {
+            $erreurs[] = 'Choisis entre remplacer ou supprimer le mot de passe SMTP, pas les deux.';
+        }
+
+        if (!empty($donnees['secrets']['transactionnel_cle_api_effacer']) && (string)($donnees['secrets']['transactionnel_cle_api'] ?? '') !== '') {
+            $erreurs[] = 'Choisis entre remplacer ou supprimer la clé API, pas les deux.';
+        }
+
+        return $erreurs;
+    }
+
+    private function enregistrerDonneesFormulaireNotifications(
+        ServiceParametreApplication $serviceParametreApplication,
+        ServiceSecretApplication $serviceSecretApplication,
+        array $donnees
+    ): void {
+        $serviceParametreApplication->enregistrerValeurBooleenne(
+            'notifications',
+            'activees',
+            !empty($donnees['notifications']['activees'])
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'notifications',
+            'email_destinataire',
+            (string)($donnees['notifications']['email_destinataire'] ?? ''),
+            'email'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'notifications',
+            'email_destinataire_activation',
+            (string)($donnees['notifications']['email_destinataire_activation'] ?? ''),
+            'email'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'notifications',
+            'email_destinataire_domaines_test',
+            (string)($donnees['notifications']['email_destinataire_domaines_test'] ?? ''),
+            'email'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'notifications',
+            'prefixe_sujet',
+            (string)($donnees['notifications']['prefixe_sujet'] ?? '[SR Licences]'),
+            'texte'
+        );
+
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email',
+            'transport',
+            (string)($donnees['email']['transport'] ?? 'mail'),
+            'choix'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email',
+            'expediteur_email',
+            (string)($donnees['email']['expediteur_email'] ?? ''),
+            'email'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email',
+            'expediteur_nom',
+            (string)($donnees['email']['expediteur_nom'] ?? 'SR Licences'),
+            'texte'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email',
+            'repondre_a_email',
+            (string)($donnees['email']['repondre_a_email'] ?? ''),
+            'email'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email',
+            'repondre_a_nom',
+            (string)($donnees['email']['repondre_a_nom'] ?? ''),
+            'texte'
+        );
+
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email_smtp',
+            'hote',
+            (string)($donnees['email']['smtp']['hote'] ?? ''),
+            'texte'
+        );
+        $serviceParametreApplication->enregistrerValeurEntiere(
+            'email_smtp',
+            'port',
+            (int)($donnees['email']['smtp']['port'] ?? 587)
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email_smtp',
+            'chiffrement',
+            (string)($donnees['email']['smtp']['chiffrement'] ?? 'tls'),
+            'choix'
+        );
+        $serviceParametreApplication->enregistrerValeurBooleenne(
+            'email_smtp',
+            'authentification',
+            !empty($donnees['email']['smtp']['authentification'])
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email_smtp',
+            'utilisateur',
+            (string)($donnees['email']['smtp']['utilisateur'] ?? ''),
+            'texte'
+        );
+
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email_transactionnel',
+            'fournisseur',
+            (string)($donnees['email']['transactionnel']['fournisseur'] ?? ''),
+            'texte'
+        );
+        $serviceParametreApplication->enregistrerValeurTexte(
+            'email_transactionnel',
+            'endpoint',
+            (string)($donnees['email']['transactionnel']['endpoint'] ?? ''),
+            'url'
+        );
+
+        if (!empty($donnees['secrets']['smtp_mot_de_passe_effacer'])) {
+            $serviceSecretApplication->supprimerSecret('email_smtp', 'mot_de_passe');
+        } elseif ((string)($donnees['secrets']['smtp_mot_de_passe'] ?? '') !== '') {
+            $serviceSecretApplication->enregistrerSecret(
+                'email_smtp',
+                'mot_de_passe',
+                (string)$donnees['secrets']['smtp_mot_de_passe']
+            );
+        }
+
+        if (!empty($donnees['secrets']['transactionnel_cle_api_effacer'])) {
+            $serviceSecretApplication->supprimerSecret('email_transactionnel', 'cle_api');
+        } elseif ((string)($donnees['secrets']['transactionnel_cle_api'] ?? '') !== '') {
+            $serviceSecretApplication->enregistrerSecret(
+                'email_transactionnel',
+                'cle_api',
+                (string)$donnees['secrets']['transactionnel_cle_api']
+            );
+        }
+    }
+
+    private function determinerDestinataireTestNotification(array $configurationNotifications): string
+    {
+        foreach ([
+            (string)($configurationNotifications['notifications']['email_destinataire'] ?? ''),
+            (string)($configurationNotifications['notifications']['email_destinataire_activation'] ?? ''),
+            (string)($configurationNotifications['notifications']['email_destinataire_domaines_test'] ?? ''),
+        ] as $destinataire) {
+            $destinataire = trim($destinataire);
+            if ($destinataire !== '') {
+                return $destinataire;
+            }
+        }
+
+        return '';
+    }
+
+    private function construireSujetTestNotification(array $configurationNotifications): string
+    {
+        $prefixeSujet = trim((string)($configurationNotifications['notifications']['prefixe_sujet'] ?? '[SR Licences]'));
+
+        return trim($prefixeSujet . ' Test de notification');
+    }
+
+    private function construireMessageTestNotification(array $configurationNotifications, string $destinataire): string
+    {
+        return implode("\n", [
+            'Ceci est un e-mail de test envoyé depuis l’interface SR Licences.',
+            '',
+            'Date UTC : ' . gmdate('c'),
+            'Transport : ' . (string)($configurationNotifications['email']['transport'] ?? ''),
+            'Expéditeur : ' . (string)($configurationNotifications['email']['expediteur_email'] ?? ''),
+            'Destinataire : ' . $destinataire,
+        ]);
+    }
+
+    private function echapperHtml(?string $valeur): string
+    {
+        return htmlspecialchars((string)$valeur, ENT_QUOTES, 'UTF-8');
+    }
 
 }
