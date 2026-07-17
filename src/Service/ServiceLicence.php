@@ -434,9 +434,11 @@ final class ServiceLicence
         ];
     }
 
-    private function versionModuleEstAutorisee(string $versionDemandee, string $versionMaxAutorisee): bool
-    {
-        $versionDemandee = $this->normaliserVersionLicence($versionDemandee);
+    private function versionModuleEstAutorisee(
+        string $versionDemandee,
+        string $versionMaxAutorisee
+    ): bool {
+        $versionDemandee = trim($versionDemandee);
         $versionMaxAutorisee = trim($versionMaxAutorisee);
 
         if ($versionMaxAutorisee === '') {
@@ -447,14 +449,38 @@ final class ServiceLicence
             return false;
         }
 
-        $motifs = preg_split('/[\r\n,;|]+/', $versionMaxAutorisee) ?: [];
-        foreach ($motifs as $motif) {
-            $motif = $this->normaliserVersionLicence($motif);
-            if ($motif === '') {
+        $versionDemandee = preg_replace('/^[vV]\s*/', '', $versionDemandee) ?? '';
+        if ($versionDemandee === '' || !preg_match('/^\d+(?:\.\d+)*$/', $versionDemandee)) {
+            return false;
+        }
+
+        $limites = preg_split('/[\r\n,;|]+/', $versionMaxAutorisee) ?: [];
+
+        foreach ($limites as $limite) {
+            $limite = trim($limite);
+            $limite = preg_replace('/^[vV]\s*/', '', $limite) ?? '';
+
+            if ($limite === '') {
                 continue;
             }
 
-            if ($this->versionCorrespondAuMotif($versionDemandee, $motif)) {
+            if (preg_match('/^(\d+(?:\.\d+)*)\.(?:\*|x)$/i', $limite, $correspondance)) {
+                $segments = array_map('intval', explode('.', $correspondance[1]));
+                $dernierIndex = count($segments) - 1;
+                $segments[$dernierIndex]++;
+
+                $borneExclusive = implode('.', $segments) . '.0';
+
+                if (version_compare($versionDemandee, $borneExclusive, '<')) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (preg_match('/^\d+(?:\.\d+)*$/', $limite)
+                && version_compare($versionDemandee, $limite, '<=')
+            ) {
                 return true;
             }
         }
