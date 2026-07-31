@@ -9,6 +9,10 @@ config/config.php
 *.sql.gz
 !sql/
 !sql/schema.sql
+# Migrations SQL versionnées
+!sql/migrations/
+!sql/migrations/*.sql
+
 
 # Logs / runtime
 var/log/*
