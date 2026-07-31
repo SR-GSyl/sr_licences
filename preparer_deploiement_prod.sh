@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ./preparer_deploiement.sh
+# ./preparer_deploiement_prod.sh
 
 # ne fait pas de commit
 # prépare un dossier de déploiement dans
@@ -36,7 +36,7 @@ rsync -avm \
   --exclude='*.bak.*' \
   --exclude='readme.txt' \
   --exclude='readme_sr_licences.txt' \
-  --exclude='preparer_deploiement.sh' \
+  --exclude='preparer_deploiement_prod.sh' \
   --exclude='preparer_commit_et_deploiement.sh' \
   --exclude='propager_vers_dev.sh' \
   --exclude='preparer_zip.sh' \

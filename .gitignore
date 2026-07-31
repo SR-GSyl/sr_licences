@@ -36,5 +36,5 @@ Thumbs.db
 .well-known/
 
 # Autres fichiers
-# preparer_deploiement.sh
+# preparer_deploiement_prod.sh
 # preparer_zip.sh

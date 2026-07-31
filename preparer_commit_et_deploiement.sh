@@ -68,7 +68,7 @@ rsync -avm \
   --exclude='var/' \
   --exclude='*.bak' \
   --exclude='*.bak.*' \
-  --exclude='preparer_deploiement.sh' \
+  --exclude='preparer_deploiement_prod.sh' \
   --exclude='preparer_commit_et_deploiement.sh' \
   --exclude='readme.txt' \
   --exclude='propager_vers_dev.sh' \

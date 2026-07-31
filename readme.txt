@@ -73,7 +73,7 @@ Commande d’exécution :
 2) Script de préparation du dossier de déploiement prod
 
 Nom :
-preparer_deploiement.sh
+preparer_deploiement_prod.sh
 
 Rôle :
 - supprimer l’ancien dossier de déploiement prod ;
@@ -81,7 +81,7 @@ Rôle :
 - copier uniquement les fichiers utiles à la prod.
 
 Commande d’exécution :
-./preparer_deploiement.sh
+./preparer_deploiement_prod.sh
 
 3) Script de commit + préparation du dossier de déploiement prod
 
@@ -112,7 +112,7 @@ Le script propager_vers_dev.sh exclut actuellement :
 - *.bak.*
 - readme.txt
 - readme_sr_licences.txt
-- preparer_deploiement.sh
+- preparer_deploiement_prod.sh
 - preparer_commit_et_deploiement.sh
 - propager_vers_dev.sh
 
@@ -135,7 +135,7 @@ Les scripts de préparation excluent actuellement :
 - *.bak.*
 - readme.txt
 - readme_sr_licences.txt
-- preparer_deploiement.sh
+- preparer_deploiement_prod.sh
 - preparer_commit_et_deploiement.sh
 - propager_vers_dev.sh
 
@@ -164,7 +164,7 @@ Procédure de travail recommandée
    http://sr-licences-dev.local/
 
 4. Préparer le dossier de déploiement prod :
-   ./preparer_deploiement.sh
+   ./preparer_deploiement_prod.sh
    ou
    ./preparer_commit_et_deploiement.sh "message"
 

@@ -27,7 +27,7 @@ sudo rsync -a --delete --chown=www-data:www-data \
   --exclude='*.bak.*' \
   --exclude='readme.txt' \
   --exclude='readme_sr_licences.txt' \
-  --exclude='preparer_deploiement.sh' \
+  --exclude='preparer_deploiement_prod.sh' \
   --exclude='preparer_commit_et_deploiement.sh' \
   --exclude='propager_vers_dev.sh' \
   "$DOSSIER_SOURCE_DEV"/ \

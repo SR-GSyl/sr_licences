@@ -25,7 +25,7 @@ zip -r "$ZIP_SORTIE" . \
   -x "*.bak.*" \
   -x "var/log/*" \
   -x "propager_vers_dev.sh" \
-  -x "preparer_deploiement.sh" \
+  -x "preparer_deploiement_prod.sh" \
   -x "preparer_commit_et_deploiement.sh" \
   -x "preparer_zip.sh"
 
