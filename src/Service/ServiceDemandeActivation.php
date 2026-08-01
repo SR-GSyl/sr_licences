@@ -207,6 +207,8 @@ final class ServiceDemandeActivation
         }
 
         $typeLicence = trim((string)($donneesDecision['type_licence'] ?? 'perpetuelle'));
+        $modeLicence = trim((string)($donneesDecision['mode_licence'] ?? 'distante'));
+        $canalVente = trim((string)($donneesDecision['canal_vente'] ?? 'non_renseigne'));
         $versionMax = trim((string)($donneesDecision['version_max_autorisee'] ?? ''));
         $noteInterne = trim((string)($donneesDecision['note_interne'] ?? ''));
 
@@ -222,6 +224,12 @@ final class ServiceDemandeActivation
             'code_module' => (string)($demande['code_module'] ?? ''),
             'statut' => 'active',
             'type_licence' => $typeLicence,
+            'mode_licence' => $modeLicence,
+            'canal_vente' => $canalVente,
+            'numero_commande' => (string)($demande['numero_commande'] ?? ''),
+            'business_care_inclus' => $donneesDecision['business_care_inclus'] ?? null,
+            'business_care_debut' => (string)($donneesDecision['business_care_debut'] ?? ''),
+            'business_care_fin' => (string)($donneesDecision['business_care_fin'] ?? ''),
             'nom_client' => (string)($demande['nom_client'] ?? ''),
             'email_client' => (string)($demande['email_client'] ?? ''),
             'domaine_principal' => (string)($demande['domaine_principal'] ?? ''),

@@ -74,6 +74,10 @@ final class ServiceLicence
         $codeModule = trim((string)($donnees['code_module'] ?? ''));
         $statut = trim((string)($donnees['statut'] ?? 'active'));
         $typeLicence = trim((string)($donnees['type_licence'] ?? 'perpetuelle'));
+        $modeLicence = $this->normaliserModeLicence($donnees['mode_licence'] ?? 'distante');
+        $canalVente = $this->normaliserCanalVente($donnees['canal_vente'] ?? 'non_renseigne');
+        $numeroCommande = trim((string)($donnees['numero_commande'] ?? ''));
+        [$businessCareInclus, $businessCareDebut, $businessCareFin] = $this->preparerBusinessCare($donnees);
         $nomClient = trim((string)($donnees['nom_client'] ?? ''));
         $emailClient = trim((string)($donnees['email_client'] ?? ''));
         $domainePrincipal = $this->normaliserDomaine((string)($donnees['domaine_principal'] ?? ''));
@@ -94,6 +98,8 @@ final class ServiceLicence
         if (!in_array($typeLicence, ['perpetuelle', 'abonnement'], true)) {
             throw new InvalidArgumentException('Le type de licence fourni est invalide.');
         }
+
+        $this->validerCoherenceCommerciale($typeLicence, $modeLicence, $canalVente);
 
         if ($emailClient !== '' && filter_var($emailClient, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException('L’adresse e-mail fournie est invalide.');
@@ -118,10 +124,16 @@ final class ServiceLicence
             'code_module' => $codeModule,
             'statut' => $statut,
             'type_licence' => $typeLicence,
+            'mode_licence' => $modeLicence,
+            'canal_vente' => $canalVente,
+            'numero_commande' => $numeroCommande,
             'nom_client' => $nomClient,
             'email_client' => $emailClient,
             'domaine_principal' => $domainePrincipal,
             'version_max_autorisee' => $versionMax,
+            'business_care_inclus' => $businessCareInclus,
+            'business_care_debut' => $businessCareDebut,
+            'business_care_fin' => $businessCareFin,
             'date_activation' => $dateActivation,
             'date_expiration' => $dateExpiration,
             'grace_jusqu_a' => $graceJusquA,
@@ -134,6 +146,12 @@ final class ServiceLicence
             'id_licence' => $idLicence,
             'cle_licence' => $cleLicence,
             'type_licence' => $typeLicence,
+            'mode_licence' => $modeLicence,
+            'canal_vente' => $canalVente,
+            'numero_commande' => $numeroCommande,
+            'business_care_inclus' => $businessCareInclus,
+            'business_care_debut' => $businessCareDebut,
+            'business_care_fin' => $businessCareFin,
             'date_expiration' => $dateExpiration,
             'grace_jusqu_a' => $graceJusquA,
             'domaines_test' => $domainesTest,
@@ -151,7 +169,13 @@ final class ServiceLicence
             throw new InvalidArgumentException('Licence introuvable.');
         }
 
-        $typeLicence = trim((string)($donnees['type_licence'] ?? 'perpetuelle'));
+        $typeLicence = trim((string)($donnees['type_licence'] ?? ($licenceCourante['type_licence'] ?? 'perpetuelle')));
+        $modeLicence = $this->normaliserModeLicence($donnees['mode_licence'] ?? ($licenceCourante['mode_licence'] ?? 'distante'));
+        $canalVente = $this->normaliserCanalVente($donnees['canal_vente'] ?? ($licenceCourante['canal_vente'] ?? 'non_renseigne'));
+        $numeroCommande = array_key_exists('numero_commande', $donnees)
+            ? trim((string)$donnees['numero_commande'])
+            : trim((string)($licenceCourante['numero_commande'] ?? ''));
+        [$businessCareInclus, $businessCareDebut, $businessCareFin] = $this->preparerBusinessCare($donnees, $licenceCourante);
         $nomClient = trim((string)($donnees['nom_client'] ?? ''));
         $emailClient = trim((string)($donnees['email_client'] ?? ''));
         $domainePrincipal = $this->normaliserDomaine((string)($donnees['domaine_principal'] ?? ''));
@@ -164,6 +188,8 @@ final class ServiceLicence
         if (!in_array($typeLicence, ['perpetuelle', 'abonnement'], true)) {
             throw new InvalidArgumentException('Le type de licence fourni est invalide.');
         }
+
+        $this->validerCoherenceCommerciale($typeLicence, $modeLicence, $canalVente);
 
         if ($emailClient !== '' && filter_var($emailClient, FILTER_VALIDATE_EMAIL) === false) {
             throw new InvalidArgumentException('L’adresse e-mail fournie est invalide.');
@@ -182,10 +208,16 @@ final class ServiceLicence
 
         $this->licenceRepository->mettreAJourLicence($idLicence, [
             'type_licence' => $typeLicence,
+            'mode_licence' => $modeLicence,
+            'canal_vente' => $canalVente,
+            'numero_commande' => $numeroCommande,
             'nom_client' => $nomClient,
             'email_client' => $emailClient,
             'domaine_principal' => $domainePrincipal,
             'version_max_autorisee' => $versionMax,
+            'business_care_inclus' => $businessCareInclus,
+            'business_care_debut' => $businessCareDebut,
+            'business_care_fin' => $businessCareFin,
             'date_expiration' => $dateExpiration,
             'grace_jusqu_a' => $graceJusquA,
             'commentaire_interne' => $commentaire,
@@ -254,10 +286,16 @@ final class ServiceLicence
 
                 $this->licenceRepository->mettreAJourLicence($idLicence, [
                     'type_licence' => $typeLicence,
+                    'mode_licence' => (string)($licence['mode_licence'] ?? 'distante'),
+                    'canal_vente' => (string)($licence['canal_vente'] ?? 'non_renseigne'),
+                    'numero_commande' => (string)($licence['numero_commande'] ?? ''),
                     'nom_client' => (string)($licence['nom_client'] ?? ''),
                     'email_client' => (string)($licence['email_client'] ?? ''),
                     'domaine_principal' => (string)($licence['domaine_principal'] ?? ''),
                     'version_max_autorisee' => (string)($licence['version_max_autorisee'] ?? ''),
+                    'business_care_inclus' => $licence['business_care_inclus'] ?? null,
+                    'business_care_debut' => (string)($licence['business_care_debut'] ?? ''),
+                    'business_care_fin' => (string)($licence['business_care_fin'] ?? ''),
                     'date_expiration' => $dateExpiration,
                     'grace_jusqu_a' => $graceJusquA,
                     'commentaire_interne' => (string)($licence['commentaire_interne'] ?? ''),
@@ -265,10 +303,16 @@ final class ServiceLicence
             } else {
                 $this->licenceRepository->mettreAJourLicence($idLicence, [
                     'type_licence' => $typeLicence,
+                    'mode_licence' => (string)($licence['mode_licence'] ?? 'distante'),
+                    'canal_vente' => (string)($licence['canal_vente'] ?? 'non_renseigne'),
+                    'numero_commande' => (string)($licence['numero_commande'] ?? ''),
                     'nom_client' => (string)($licence['nom_client'] ?? ''),
                     'email_client' => (string)($licence['email_client'] ?? ''),
                     'domaine_principal' => (string)($licence['domaine_principal'] ?? ''),
                     'version_max_autorisee' => (string)($licence['version_max_autorisee'] ?? ''),
+                    'business_care_inclus' => $licence['business_care_inclus'] ?? null,
+                    'business_care_debut' => (string)($licence['business_care_debut'] ?? ''),
+                    'business_care_fin' => (string)($licence['business_care_fin'] ?? ''),
                     'date_expiration' => null,
                     'grace_jusqu_a' => null,
                     'commentaire_interne' => (string)($licence['commentaire_interne'] ?? ''),
@@ -782,6 +826,102 @@ final class ServiceLicence
             json_encode($actifs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             LOCK_EX
         );
+    }
+
+    private function normaliserModeLicence(mixed $valeur): string
+    {
+        $modeLicence = trim(mb_strtolower((string)$valeur));
+
+        if (!in_array($modeLicence, ['distante', 'autonome'], true)) {
+            throw new InvalidArgumentException('Le mode de licence fourni est invalide.');
+        }
+
+        return $modeLicence;
+    }
+
+    private function normaliserCanalVente(mixed $valeur): string
+    {
+        $canalVente = trim(mb_strtolower((string)$valeur));
+
+        if (!in_array($canalVente, ['non_renseigne', 'soul_rebel_eshop', 'prestashop_addons'], true)) {
+            throw new InvalidArgumentException('Le canal de vente fourni est invalide.');
+        }
+
+        return $canalVente;
+    }
+
+    private function validerCoherenceCommerciale(
+        string $typeLicence,
+        string $modeLicence,
+        string $canalVente
+    ): void {
+        if ($modeLicence === 'autonome' && $typeLicence !== 'perpetuelle') {
+            throw new InvalidArgumentException('Une licence autonome doit être perpétuelle.');
+        }
+
+        if ($canalVente === 'prestashop_addons' && $modeLicence !== 'autonome') {
+            throw new InvalidArgumentException('Une licence PrestaShop Addons doit utiliser le mode autonome.');
+        }
+    }
+
+    private function preparerBusinessCare(array $donnees, ?array $licenceExistante = null): array
+    {
+        $champInclusPresent = array_key_exists('business_care_inclus', $donnees);
+        $champDebutPresent = array_key_exists('business_care_debut', $donnees);
+        $champFinPresent = array_key_exists('business_care_fin', $donnees);
+
+        if (!$champInclusPresent && !$champDebutPresent && !$champFinPresent && $licenceExistante !== null) {
+            return [
+                $this->normaliserBusinessCareInclus($licenceExistante['business_care_inclus'] ?? null),
+                $this->normaliserDateHeureNullable($licenceExistante['business_care_debut'] ?? null),
+                $this->normaliserDateHeureNullable($licenceExistante['business_care_fin'] ?? null),
+            ];
+        }
+
+        $inclus = $this->normaliserBusinessCareInclus($donnees['business_care_inclus'] ?? null);
+        $debut = $this->normaliserDateHeureNullable($donnees['business_care_debut'] ?? null);
+        $fin = $this->normaliserDateHeureNullable($donnees['business_care_fin'] ?? null);
+
+        if ($inclus !== 1) {
+            if ($debut !== null || $fin !== null) {
+                throw new InvalidArgumentException('Les dates Business Care nécessitent l’indication Business Care inclus.');
+            }
+
+            return [$inclus, null, null];
+        }
+
+        if ($debut === null || $fin === null) {
+            throw new InvalidArgumentException('Les dates de début et de fin Business Care sont obligatoires lorsque Business Care est inclus.');
+        }
+
+        if (new \DateTimeImmutable($fin) < new \DateTimeImmutable($debut)) {
+            throw new InvalidArgumentException('La fin de Business Care doit être postérieure ou égale à son début.');
+        }
+
+        return [$inclus, $debut, $fin];
+    }
+
+    private function normaliserBusinessCareInclus(mixed $valeur): ?int
+    {
+        if ($valeur === null) {
+            return null;
+        }
+
+        $texte = trim(mb_strtolower((string)$valeur));
+
+        if ($texte === '' || in_array($texte, ['null', 'inconnu', 'non_renseigne'], true)) {
+            return null;
+        }
+
+        if (in_array($texte, ['1', 'oui', 'true'], true)) {
+            return 1;
+        }
+
+        if (in_array($texte, ['0', 'non', 'false'], true)) {
+            return 0;
+        }
+
+        throw new InvalidArgumentException('La valeur Business Care incluse est invalide.');
     }
 
     private function extraireDomainesTest(mixed $valeur): array
