@@ -254,11 +254,39 @@ final class CertificatLicenceAutonome
     private static function normaliserVersionMax(string $version): string
     {
         $version = trim($version);
-        if ($version === '' || strlen($version) > 50 || !preg_match('/^[0-9A-Za-z][0-9A-Za-z._+-]*$/', $version)) {
+        if ($version === '' || strlen($version) > 50) {
             throw new InvalidArgumentException('La version maximale autorisée du certificat autonome est invalide.');
         }
 
-        return $version;
+        $limites = preg_split('/[\r\n,;|]+/', $version) ?: [];
+        $normalisees = [];
+
+        foreach ($limites as $limite) {
+            $limite = trim((string)$limite);
+            $limite = preg_replace('/^[vV]\s*/', '', $limite) ?? '';
+
+            if ($limite === '') {
+                continue;
+            }
+
+            if (preg_match('/^(\d+(?:\.\d+)*)\.(?:\*|x)$/i', $limite, $correspondance)) {
+                $limite = $correspondance[1] . '.*';
+            } elseif (!preg_match('/^\d+(?:\.\d+)*$/', $limite)) {
+                throw new InvalidArgumentException('La version maximale autorisée du certificat autonome est invalide.');
+            }
+
+            $normalisees[] = $limite;
+        }
+
+        $normalisees = array_values(array_unique($normalisees));
+        sort($normalisees, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $versionCanonique = implode('|', $normalisees);
+        if ($versionCanonique === '' || strlen($versionCanonique) > 50) {
+            throw new InvalidArgumentException('La version maximale autorisée du certificat autonome est invalide.');
+        }
+
+        return $versionCanonique;
     }
 
     private static function normaliserDomaine(string $domaine): string
