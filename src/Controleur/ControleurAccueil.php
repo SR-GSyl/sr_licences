@@ -335,6 +335,28 @@ final class ControleurAccueil
           </div>
 
           <div class="champ">
+            <label for="mode_licence">Mode de licence</label>
+            <select id="mode_licence" name="mode_licence" required>
+              <option value="distante">distante</option>
+              <option value="autonome">autonome</option>
+            </select>
+          </div>
+
+          <div class="champ">
+            <label for="canal_vente">Canal de vente</label>
+            <select id="canal_vente" name="canal_vente" required>
+              <option value="non_renseigne">non renseigné</option>
+              <option value="soul_rebel_eshop">Soul Rebel E-Shop</option>
+              <option value="prestashop_addons">PrestaShop Addons</option>
+            </select>
+          </div>
+
+          <div class="champ">
+            <label for="numero_commande">N° de commande</label>
+            <input type="text" id="numero_commande" name="numero_commande">
+          </div>
+
+          <div class="champ">
             <label for="nom_client">Nom client</label>
             <input type="text" id="nom_client" name="nom_client">
           </div>
@@ -352,6 +374,25 @@ final class ControleurAccueil
           <div class="champ">
             <label for="version_max_autorisee">Version max autorisée</label>
             <input type="text" id="version_max_autorisee" name="version_max_autorisee" placeholder="2.6.*">
+          </div>
+
+          <div class="champ">
+            <label for="business_care_inclus">Business Care</label>
+            <select id="business_care_inclus" name="business_care_inclus">
+              <option value="">non renseigné</option>
+              <option value="0">non inclus</option>
+              <option value="1">inclus</option>
+            </select>
+          </div>
+
+          <div class="champ" id="bloc_business_care_debut" style="display:none;">
+            <label for="business_care_debut">Début Business Care</label>
+            <input type="datetime-local" id="business_care_debut" name="business_care_debut" disabled>
+          </div>
+
+          <div class="champ" id="bloc_business_care_fin" style="display:none;">
+            <label for="business_care_fin">Fin Business Care</label>
+            <input type="datetime-local" id="business_care_fin" name="business_care_fin" disabled>
           </div>
 
           <div class="champ" id="bloc_validite_valeur">
@@ -413,6 +454,13 @@ final class ControleurAccueil
       <script>
       (function () {
         var selectType = document.getElementById('type_licence');
+        var selectMode = document.getElementById('mode_licence');
+        var selectCanal = document.getElementById('canal_vente');
+        var selectBusinessCare = document.getElementById('business_care_inclus');
+        var blocBusinessCareDebut = document.getElementById('bloc_business_care_debut');
+        var blocBusinessCareFin = document.getElementById('bloc_business_care_fin');
+        var champBusinessCareDebut = document.getElementById('business_care_debut');
+        var champBusinessCareFin = document.getElementById('business_care_fin');
         var idsBlocs = [
           'bloc_validite_valeur',
           'bloc_validite_unite',
@@ -446,6 +494,12 @@ final class ControleurAccueil
             }
           });
 
+          champs.forEach(function (champ) {
+            if (champ) {
+              champ.disabled = !estAbonnement;
+            }
+          });
+
           if (!estAbonnement) {
             champs.forEach(function (champ) {
               if (!champ) {
@@ -462,6 +516,47 @@ final class ControleurAccueil
           }
         }
 
+        function appliquerCoherenceCommerciale(source) {
+          if (!selectMode || !selectCanal) {
+            return;
+          }
+
+          if (source === 'canal' && selectCanal.value === 'prestashop_addons') {
+            selectMode.value = 'autonome';
+            selectType.value = 'perpetuelle';
+          } else if (source === 'mode' && selectMode.value === 'autonome') {
+            selectType.value = 'perpetuelle';
+          } else if (source === 'type' && selectType.value === 'abonnement') {
+            selectMode.value = 'distante';
+            if (selectCanal.value === 'prestashop_addons') {
+              selectCanal.value = 'non_renseigne';
+            }
+          }
+
+          mettreAJourVisibiliteDates();
+        }
+
+        function mettreAJourBusinessCare() {
+          if (!selectBusinessCare) {
+            return;
+          }
+
+          var estInclus = selectBusinessCare.value === '1';
+
+          [blocBusinessCareDebut, blocBusinessCareFin].forEach(function (bloc) {
+            if (bloc) {
+              bloc.style.display = estInclus ? '' : 'none';
+            }
+          });
+
+          [champBusinessCareDebut, champBusinessCareFin].forEach(function (champ) {
+            if (champ) {
+              champ.disabled = !estInclus;
+              champ.required = estInclus;
+            }
+          });
+        }
+
         if (boutonAccordeon && contenuAccordeon) {
           boutonAccordeon.addEventListener('click', function () {
             var ouvert = contenuAccordeon.classList.toggle('ouvert');
@@ -469,8 +564,28 @@ final class ControleurAccueil
           });
         }
 
-        selectType.addEventListener('change', mettreAJourVisibiliteDates);
+        selectType.addEventListener('change', function () {
+          appliquerCoherenceCommerciale('type');
+        });
+
+        if (selectMode) {
+          selectMode.addEventListener('change', function () {
+            appliquerCoherenceCommerciale('mode');
+          });
+        }
+
+        if (selectCanal) {
+          selectCanal.addEventListener('change', function () {
+            appliquerCoherenceCommerciale('canal');
+          });
+        }
+
+        if (selectBusinessCare) {
+          selectBusinessCare.addEventListener('change', mettreAJourBusinessCare);
+        }
+
         mettreAJourVisibiliteDates();
+        mettreAJourBusinessCare();
       })();
       </script>
       </div>
@@ -2363,7 +2478,12 @@ final class ControleurAccueil
         <h2 style="margin-top:0;">Valider la demande et créer la licence</h2>
         <div class="grille-form">
           <div class="champ"><label>Type de licence</label><select name="type_licence" id="sr_type_licence_decision"><option value="perpetuelle">perpétuelle</option><option value="abonnement">abonnement</option></select></div>
+          <div class="champ"><label>Mode de licence</label><select name="mode_licence" id="sr_mode_licence_decision"><option value="distante">distante</option><option value="autonome">autonome</option></select></div>
+          <div class="champ"><label>Canal de vente</label><select name="canal_vente" id="sr_canal_vente_decision"><option value="non_renseigne">non renseigné</option><option value="soul_rebel_eshop">Soul Rebel E-Shop</option><option value="prestashop_addons">PrestaShop Addons</option></select></div>
           <div class="champ"><label>Version max autorisée</label><input type="text" name="version_max_autorisee" value="<?php echo htmlspecialchars($this->suggererVersionMaxAutorisee((string)($demande['version_module'] ?? '')), ENT_QUOTES, 'UTF-8'); ?>" placeholder="2.6.*"></div>
+          <div class="champ"><label>Business Care</label><select name="business_care_inclus" id="sr_business_care_inclus_decision"><option value="">non renseigné</option><option value="0">non inclus</option><option value="1">inclus</option></select></div>
+          <div class="champ" data-sr-business-care="1" style="display:none;"><label>Début Business Care</label><input type="datetime-local" name="business_care_debut" disabled></div>
+          <div class="champ" data-sr-business-care="1" style="display:none;"><label>Fin Business Care</label><input type="datetime-local" name="business_care_fin" disabled></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de validité</label><input type="number" min="1" step="1" name="validite_valeur" value="12"></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Unité de validité</label><select name="validite_unite"><option value="jours">jours</option><option value="semaines">semaines</option><option value="mois" selected>mois</option><option value="annees">années</option></select></div>
           <div class="champ sr-champ-abonnement" data-sr-abonnement="1"><label>Durée de grâce</label><input type="number" min="0" step="1" name="grace_valeur" value="7"></div>
@@ -2396,14 +2516,16 @@ final class ControleurAccueil
   <script>
   (function () {
     var selectType = document.getElementById('sr_type_licence_decision');
+    var selectMode = document.getElementById('sr_mode_licence_decision');
+    var selectCanal = document.getElementById('sr_canal_vente_decision');
+    var selectBusinessCare = document.getElementById('sr_business_care_inclus_decision');
+
     if (!selectType) {
       return;
     }
 
     var blocsAbonnement = Array.prototype.slice.call(document.querySelectorAll('[data-sr-abonnement="1"]'));
-    if (!blocsAbonnement.length) {
-      return;
-    }
+    var blocsBusinessCare = Array.prototype.slice.call(document.querySelectorAll('[data-sr-business-care="1"]'));
 
     function mettreAJourVisibiliteAbonnement() {
       var estAbonnement = selectType.value === 'abonnement';
@@ -2418,8 +2540,62 @@ final class ControleurAccueil
       });
     }
 
-    selectType.addEventListener('change', mettreAJourVisibiliteAbonnement);
+    function appliquerCoherenceCommerciale(source) {
+      if (!selectMode || !selectCanal) {
+        return;
+      }
+
+      if (source === 'canal' && selectCanal.value === 'prestashop_addons') {
+        selectMode.value = 'autonome';
+        selectType.value = 'perpetuelle';
+      } else if (source === 'mode' && selectMode.value === 'autonome') {
+        selectType.value = 'perpetuelle';
+      } else if (source === 'type' && selectType.value === 'abonnement') {
+        selectMode.value = 'distante';
+        if (selectCanal.value === 'prestashop_addons') {
+          selectCanal.value = 'non_renseigne';
+        }
+      }
+
+      mettreAJourVisibiliteAbonnement();
+    }
+
+    function mettreAJourBusinessCare() {
+      var estInclus = selectBusinessCare && selectBusinessCare.value === '1';
+
+      blocsBusinessCare.forEach(function (bloc) {
+        bloc.style.display = estInclus ? '' : 'none';
+
+        var champs = bloc.querySelectorAll('input, select, textarea');
+        champs.forEach(function (champ) {
+          champ.disabled = !estInclus;
+          champ.required = estInclus;
+        });
+      });
+    }
+
+    selectType.addEventListener('change', function () {
+      appliquerCoherenceCommerciale('type');
+    });
+
+    if (selectMode) {
+      selectMode.addEventListener('change', function () {
+        appliquerCoherenceCommerciale('mode');
+      });
+    }
+
+    if (selectCanal) {
+      selectCanal.addEventListener('change', function () {
+        appliquerCoherenceCommerciale('canal');
+      });
+    }
+
+    if (selectBusinessCare) {
+      selectBusinessCare.addEventListener('change', mettreAJourBusinessCare);
+    }
+
     mettreAJourVisibiliteAbonnement();
+    mettreAJourBusinessCare();
   })();
   </script>
 </body>
@@ -2490,6 +2666,25 @@ final class ControleurAccueil
         'abonnement' => 'abonnement',
         default => ($typeLicence !== '' ? $typeLicence : '—'),
     }; ?>
+    <?php $modeLicence = (string)($licence['mode_licence'] ?? ''); ?>
+    <?php $modeLicenceLibelle = match ($modeLicence) {
+        'distante' => 'distante',
+        'autonome' => 'autonome',
+        default => ($modeLicence !== '' ? $modeLicence : '—'),
+    }; ?>
+    <?php $canalVente = (string)($licence['canal_vente'] ?? ''); ?>
+    <?php $canalVenteLibelle = match ($canalVente) {
+        'non_renseigne' => 'non renseigné',
+        'soul_rebel_eshop' => 'Soul Rebel E-Shop',
+        'prestashop_addons' => 'PrestaShop Addons',
+        default => ($canalVente !== '' ? $canalVente : '—'),
+    }; ?>
+    <?php $businessCareInclus = $licence['business_care_inclus'] ?? null; ?>
+    <?php $businessCareLibelle = match ((string)$businessCareInclus) {
+        '1' => 'inclus',
+        '0' => 'non inclus',
+        default => 'non renseigné',
+    }; ?>
 
     <div class="grille-fiche">
       <div class="carte-fiche">
@@ -2519,6 +2714,36 @@ final class ControleurAccueil
       <div class="carte-fiche">
         <div class="libelle">Type de licence</div>
         <div class="contenu"><?php echo htmlspecialchars($typeLicenceLibelle, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Mode de licence</div>
+        <div class="contenu"><?php echo htmlspecialchars($modeLicenceLibelle, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Canal de vente</div>
+        <div class="contenu"><?php echo htmlspecialchars($canalVenteLibelle, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">N° de commande</div>
+        <div class="contenu"><code><?php echo htmlspecialchars((string)($licence['numero_commande'] ?? '—'), ENT_QUOTES, 'UTF-8'); ?></code></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Business Care</div>
+        <div class="contenu"><?php echo htmlspecialchars($businessCareLibelle, ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Début Business Care</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['business_care_debut'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
+      </div>
+
+      <div class="carte-fiche">
+        <div class="libelle">Fin Business Care</div>
+        <div class="contenu"><?php echo htmlspecialchars($this->formaterDate((string)($licence['business_care_fin'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></div>
       </div>
 
       <div class="carte-fiche">
@@ -2607,6 +2832,12 @@ final class ControleurAccueil
                 $service = new ServiceLicence(new LicenceRepository($pdo));
                 $service->modifierLicence($idLicence, [
                     'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
+                    'mode_licence' => (string)($_POST['mode_licence'] ?? 'distante'),
+                    'canal_vente' => (string)($_POST['canal_vente'] ?? 'non_renseigne'),
+                    'numero_commande' => (string)($_POST['numero_commande'] ?? ''),
+                    'business_care_inclus' => $_POST['business_care_inclus'] ?? null,
+                    'business_care_debut' => (string)($_POST['business_care_debut'] ?? ''),
+                    'business_care_fin' => (string)($_POST['business_care_fin'] ?? ''),
                     'nom_client' => (string)($_POST['nom_client'] ?? ''),
                     'email_client' => (string)($_POST['email_client'] ?? ''),
                     'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
@@ -2716,6 +2947,7 @@ final class ControleurAccueil
     <?php endif; ?>
 
     <?php $statut = (string)($licence['statut'] ?? ''); ?>
+    <?php $businessCareInclus = $licence['business_care_inclus'] ?? null; ?>
 
     <div class="grille-info">
       <div class="carte-info">
@@ -2780,6 +3012,53 @@ final class ControleurAccueil
               <input type="text" id="version_max_autorisee" name="version_max_autorisee" value="<?php echo htmlspecialchars((string)($licence['version_max_autorisee'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
             </div>
           </div>
+        </div>
+
+        <div class="section-formulaire">
+          <h2>Canal de vente et Business Care</h2>
+          <div class="grille-form">
+            <div class="champ">
+              <label for="mode_licence">Mode de licence</label>
+              <select id="mode_licence" name="mode_licence" required>
+                <option value="distante" <?php echo (($licence['mode_licence'] ?? '') === 'distante') ? 'selected' : ''; ?>>distante</option>
+                <option value="autonome" <?php echo (($licence['mode_licence'] ?? '') === 'autonome') ? 'selected' : ''; ?>>autonome</option>
+              </select>
+            </div>
+
+            <div class="champ">
+              <label for="canal_vente">Canal de vente</label>
+              <select id="canal_vente" name="canal_vente" required>
+                <option value="non_renseigne" <?php echo (($licence['canal_vente'] ?? '') === 'non_renseigne') ? 'selected' : ''; ?>>non renseigné</option>
+                <option value="soul_rebel_eshop" <?php echo (($licence['canal_vente'] ?? '') === 'soul_rebel_eshop') ? 'selected' : ''; ?>>Soul Rebel E-Shop</option>
+                <option value="prestashop_addons" <?php echo (($licence['canal_vente'] ?? '') === 'prestashop_addons') ? 'selected' : ''; ?>>PrestaShop Addons</option>
+              </select>
+            </div>
+
+            <div class="champ">
+              <label for="numero_commande">N° de commande</label>
+              <input type="text" id="numero_commande" name="numero_commande" value="<?php echo htmlspecialchars((string)($licence['numero_commande'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <div class="champ">
+              <label for="business_care_inclus">Business Care</label>
+              <select id="business_care_inclus" name="business_care_inclus">
+                <option value="" <?php echo ($businessCareInclus === null) ? 'selected' : ''; ?>>non renseigné</option>
+                <option value="0" <?php echo ((string)$businessCareInclus === '0') ? 'selected' : ''; ?>>non inclus</option>
+                <option value="1" <?php echo ((string)$businessCareInclus === '1') ? 'selected' : ''; ?>>inclus</option>
+              </select>
+            </div>
+
+            <div class="champ" data-sr-business-care-modification="1">
+              <label for="business_care_debut">Début Business Care</label>
+              <input type="datetime-local" id="business_care_debut" name="business_care_debut" value="<?php echo htmlspecialchars(((string)($licence['business_care_debut'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['business_care_debut'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+
+            <div class="champ" data-sr-business-care-modification="1">
+              <label for="business_care_fin">Fin Business Care</label>
+              <input type="datetime-local" id="business_care_fin" name="business_care_fin" value="<?php echo htmlspecialchars(((string)($licence['business_care_fin'] ?? '') !== '') ? date('Y-m-d\TH:i', strtotime((string)$licence['business_care_fin'])) : '', ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+          </div>
+          <p class="muted" style="margin:14px 0 0 0;">Business Care décrit l’accès au support et aux mises à jour. Son échéance ne retire pas le droit d’utiliser une version déjà autorisée.</p>
         </div>
 
         <div class="section-formulaire" id="section_abonnement_modification">
@@ -2864,6 +3143,10 @@ final class ControleurAccueil
   <script>
   (function () {
     var selectType = document.getElementById('type_licence');
+    var selectMode = document.getElementById('mode_licence');
+    var selectCanal = document.getElementById('canal_vente');
+    var selectBusinessCare = document.getElementById('business_care_inclus');
+    var blocsBusinessCare = Array.prototype.slice.call(document.querySelectorAll('[data-sr-business-care-modification="1"]'));
     var champs = [
       document.getElementById('validite_valeur'),
       document.getElementById('validite_unite'),
@@ -2914,6 +3197,40 @@ final class ControleurAccueil
       }
     }
 
+    function appliquerCoherenceCommerciale(source) {
+      if (!selectMode || !selectCanal) {
+        return;
+      }
+
+      if (source === 'canal' && selectCanal.value === 'prestashop_addons') {
+        selectMode.value = 'autonome';
+        selectType.value = 'perpetuelle';
+      } else if (source === 'mode' && selectMode.value === 'autonome') {
+        selectType.value = 'perpetuelle';
+      } else if (source === 'type' && selectType.value === 'abonnement') {
+        selectMode.value = 'distante';
+        if (selectCanal.value === 'prestashop_addons') {
+          selectCanal.value = 'non_renseigne';
+        }
+      }
+
+      mettreAJourVisibiliteDates();
+    }
+
+    function mettreAJourBusinessCare() {
+      var estInclus = selectBusinessCare && selectBusinessCare.value === '1';
+
+      blocsBusinessCare.forEach(function (bloc) {
+        bloc.style.display = estInclus ? '' : 'none';
+
+        var champsBusinessCare = bloc.querySelectorAll('input, select, textarea');
+        champsBusinessCare.forEach(function (champ) {
+          champ.disabled = !estInclus;
+          champ.required = estInclus;
+        });
+      });
+    }
+
     if (boutonAvance && blocAvance) {
       boutonAvance.addEventListener('click', function () {
         var ouvert = blocAvance.classList.toggle('ouvert');
@@ -2921,8 +3238,28 @@ final class ControleurAccueil
       });
     }
 
-    selectType.addEventListener('change', mettreAJourVisibiliteDates);
+    selectType.addEventListener('change', function () {
+      appliquerCoherenceCommerciale('type');
+    });
+
+    if (selectMode) {
+      selectMode.addEventListener('change', function () {
+        appliquerCoherenceCommerciale('mode');
+      });
+    }
+
+    if (selectCanal) {
+      selectCanal.addEventListener('change', function () {
+        appliquerCoherenceCommerciale('canal');
+      });
+    }
+
+    if (selectBusinessCare) {
+      selectBusinessCare.addEventListener('change', mettreAJourBusinessCare);
+    }
+
     mettreAJourVisibiliteDates();
+    mettreAJourBusinessCare();
   })();
   </script>
 </body>
@@ -2957,6 +3294,12 @@ final class ControleurAccueil
                 'code_module' => (string)($_POST['code_module'] ?? ''),
                 'statut' => (string)($_POST['statut'] ?? 'active'),
                 'type_licence' => (string)($_POST['type_licence'] ?? 'perpetuelle'),
+                'mode_licence' => (string)($_POST['mode_licence'] ?? 'distante'),
+                'canal_vente' => (string)($_POST['canal_vente'] ?? 'non_renseigne'),
+                'numero_commande' => (string)($_POST['numero_commande'] ?? ''),
+                'business_care_inclus' => $_POST['business_care_inclus'] ?? null,
+                'business_care_debut' => (string)($_POST['business_care_debut'] ?? ''),
+                'business_care_fin' => (string)($_POST['business_care_fin'] ?? ''),
                 'nom_client' => (string)($_POST['nom_client'] ?? ''),
                 'email_client' => (string)($_POST['email_client'] ?? ''),
                 'domaine_principal' => (string)($_POST['domaine_principal'] ?? ''),
@@ -3015,6 +3358,11 @@ final class ControleurAccueil
 
                 $resultat = $service->validerDemandeActivation($idDemandeActivation, [
                     'type_licence' => $typeLicence,
+                    'mode_licence' => (string)($_POST['mode_licence'] ?? 'distante'),
+                    'canal_vente' => (string)($_POST['canal_vente'] ?? 'non_renseigne'),
+                    'business_care_inclus' => $_POST['business_care_inclus'] ?? null,
+                    'business_care_debut' => (string)($_POST['business_care_debut'] ?? ''),
+                    'business_care_fin' => (string)($_POST['business_care_fin'] ?? ''),
                     'version_max_autorisee' => (string)($_POST['version_max_autorisee'] ?? ''),
                     'validite_valeur' => $estAbonnement ? (string)($_POST['validite_valeur'] ?? '') : '',
                     'validite_unite' => $estAbonnement ? (string)($_POST['validite_unite'] ?? 'mois') : 'mois',
