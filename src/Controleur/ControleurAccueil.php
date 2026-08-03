@@ -8,6 +8,7 @@ use SrLicences\Http\ReponseJson;
 use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\DemandeDomainesTestRepository;
 use SrLicences\Repository\LicenceRepository;
+use SrLicences\Service\ServiceActivationLicence;
 use SrLicences\Service\ServiceConfigurationNotifications;
 use SrLicences\Service\ServiceDemandeActivation;
 use SrLicences\Service\ServiceDemandeDomainesTest;
@@ -3347,16 +3348,22 @@ final class ControleurAccueil
             $actionDecision = trim((string)($_POST['action_decision'] ?? ''));
 
             $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
-            $service = new ServiceDemandeActivation(
+
+            $serviceDemandesActivation = new ServiceDemandeActivation(
                 new DemandeActivationRepository($pdo),
                 new LicenceRepository($pdo)
+            );
+
+            $serviceActivationLicence = new ServiceActivationLicence(
+                $pdo,
+                $this->config
             );
 
             if ($actionDecision === 'valider') {
                 $typeLicence = (string)($_POST['type_licence'] ?? 'perpetuelle');
                 $estAbonnement = ($typeLicence === 'abonnement');
 
-                $resultat = $service->validerDemandeActivation($idDemandeActivation, [
+                $resultat = $serviceActivationLicence->validerDemandeActivation($idDemandeActivation, [
                     'type_licence' => $typeLicence,
                     'mode_licence' => (string)($_POST['mode_licence'] ?? 'distante'),
                     'canal_vente' => (string)($_POST['canal_vente'] ?? 'non_renseigne'),
@@ -3377,7 +3384,7 @@ final class ControleurAccueil
                     'Demande #' . (int)($resultat['id_demande_activation'] ?? 0) .
                     ' validée. Licence créée : ' . (string)($resultat['cle_licence'] ?? '');
             } elseif ($actionDecision === 'refuser') {
-                $resultat = $service->refuserDemandeActivation(
+                $resultat = $serviceDemandesActivation->refuserDemandeActivation(
                     $idDemandeActivation,
                     (string)($_POST['note_interne'] ?? '')
                 );

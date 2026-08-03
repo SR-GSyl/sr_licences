@@ -10,6 +10,7 @@ use SrLicences\Http\Requete;
 use SrLicences\Repository\DemandeActivationRepository;
 use SrLicences\Repository\DemandeDomainesTestRepository;
 use SrLicences\Repository\LicenceRepository;
+use SrLicences\Service\ServiceActivationLicence;
 use SrLicences\Service\ServiceDemandeActivation;
 use SrLicences\Service\ServiceConfigurationNotifications;
 use SrLicences\Service\ServiceDemandeDomainesTest;
@@ -100,12 +101,14 @@ final class ControleurApiLicence
     {
         try {
             $pdo = BaseDeDonnees::creerDepuisConfig($this->config);
-            $service = new ServiceDemandeActivation(
-                new DemandeActivationRepository($pdo),
-                new LicenceRepository($pdo)
+            $service = new ServiceActivationLicence(
+                $pdo,
+                $this->config
             );
 
-            $resultat = $service->verifierActivation(Requete::donneesEntree());
+            $resultat = $service->verifierActivation(
+                Requete::donneesEntree()
+            );
             ReponseJson::envoyer($resultat, 200);
         } catch (InvalidArgumentException $e) {
             ReponseJson::envoyer([
